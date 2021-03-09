@@ -1,23 +1,21 @@
-#include "../header/rdscan.h"
+#include "../header/varinfo.h"
 #include "../header/bio_files.h"
 
 using namespace std;
 pthread_mutex_t mutex_temp = PTHREAD_MUTEX_INITIALIZER;
 
 
-CRD::CRD(int nStatus, string sBamFile, string sBamFileN, string sRefFile, string sInputFile, string sOutputFile, int nCntThread, bool bIsDebug)
+CINFO::CINFO(string sBamFile, string sInputFile, string sOutputFile, bool bIsMod, int nCntThread, bool bIsDebug)
 {
-	m_nStatus = nStatus;
 	m_sBamFile = sBamFile;
-	m_sBamFileN = sBamFileN;
-	m_sRefFile = sRefFile;
 	m_sInputFile = sInputFile;
 	m_sOutputFile = sOutputFile;
+	m_bIsMod = bIsMod;
 	m_nCntThread = nCntThread;
 	m_bIsDebug = bIsDebug;
 }
 
-
+/*
 
 bool CRD::ReadInput()
 {
@@ -86,7 +84,7 @@ bool CRD::ReadVcf()
 
 
 
-
+*/
 
 
 

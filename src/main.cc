@@ -15,7 +15,7 @@
   * *  AUTHOR : Sunho Lee
   * *  E-MAIL : shlee@syntekabio.com
   * *
-  * *  DESCRIPTION : source file for RDscan
+  * *  DESCRIPTION : source file for VARinfo
   * *
   * **************************************************************************/
 
@@ -30,27 +30,26 @@
 //#include "../header/bam_to_fastq.h"
 //#include "../header/gen_fasta.h"
 //#include "../header/determine_seq.h"
-#include "../header/rdscan.h"
+#include "../header/varinfo.h"
 //#include "../header/fisher.h"
 
 
 using namespace std;
 
-int parse_opt(const int argc, char **argv, int &nStatus, string &sBamFile, string &sBamFileN, string &sRefFile, 
-	string &sInputFile, string &sOutputFile, int &nCntThread, bool &bIsDebug);
+int parse_opt(const int argc, char **argv, int &nStatus, string &sBamFile, 
+	string &sInputFile, string &sOutputFile, bool &bIsMod, int &nCntThread, bool &bIsDebug);
 bool manual()
 {
 	cout << "====================================== RDscan manual ====================================" << endl;
 	cout << "1. COMMANDs"											<< endl;
-	cout << "  (1) Single Sample" 									<< endl;
-    cout << "      ./rd_scan -b ${Bam} -r ${Ref Fasta} -i ${Vcf} -o ${Output Vcf}" 	<< endl;
-	cout << "  (2) Paired Samples" 									<< endl;
-	cout << "      ./rd_scan -b ${Tumor Bam} -n ${Normal Bam} -r ${Ref Fasta} -i ${Vcf} -o ${Output Vcf}" 	<< endl;
+	cout << "  (1) Output Variant Info" 									<< endl;
+    cout << "      ./varinfo -b ${Bamfile} -i ${Adifile} -o ${Output}" 	<< endl;
 
 	cout << endl;
 	cout << "2. OPTIONs" << endl;
-	cout << "  (1) # of Thread			-t	[unsigned int], default=1"				<< endl;
-	cout << "============================================================================================" << endl << endl;
+	cout << "  (1) # of Thread                     -t    [unsigned int], default=1"				<< endl;
+	cout << "  (2) consecurive SNPs to Indel       -m"	<< endl;
+	cout << "==========================================================================================" << endl << endl;
 
 	return true;
 }
@@ -60,36 +59,34 @@ int main(int argc, char* argv[])
 {
 	int nStatus = 1;			// 1:vcf 
 	string sBamFile = "";			//bam file
-	string sBamFileN = "";
-	string sRefFile;
 	string sInputFile;
 	string sOutputFile;
 	int nCntThread = 1;
 	bool bIsDebug = false;
+	bool bIsMod = false;
 
 
 	try
 	{
-		parse_opt(argc, argv, nStatus, sBamFile, sBamFileN, sRefFile, sInputFile, sOutputFile, nCntThread, bIsDebug); 
+		parse_opt(argc, argv, nStatus, sBamFile, sInputFile, sOutputFile, bIsMod, nCntThread, bIsDebug); 
 		if(nStatus == 0)			manual();
 		else
 		{
-			if(nStatus == 3 && sBamFileN == "")		throw std::logic_error("VARscan is available with paired samples");
-
 			//construct class & init
-			CRD RD(nStatus, sBamFile, sBamFileN, sRefFile, sInputFile, sOutputFile, nCntThread, bIsDebug);
+			CINFO INFO(sBamFile, sInputFile, sOutputFile, bIsMod, nCntThread, bIsDebug);
 
-			RD.PrintCommonInfo();
+		
+			INFO.PrintCommonInfo();
 			cout << endl;
-
+ 
 			//read files (ref, input)
-			RD.ReadInput();
+			//RD.ReadInput();
 			
 			//calculate read distribution
-			RD.CalcDist();		
+			//RD.CalcDist();		
 			
 			//report
-			RD.Report();
+			//RD.Report();
 		}
 	}
 	catch (std::logic_error const& s)
@@ -113,24 +110,19 @@ int main(int argc, char* argv[])
 }
 
 
-int parse_opt(const int argc, char **argv, int &nStatus, string &sBamFile, string &sBamFileN, string &sRefFile, 
-	string &sInputFile, string &sOutputFile, int &nCntThread, bool &bIsDebug)
+int parse_opt(const int argc, char **argv, int &nStatus, string &sBamFile, 
+string &sInputFile, string &sOutputFile, bool &bIsMod, int &nCntThread, bool &bIsDebug)
 {
 	bool bBOption = false;
-	bool bNOption = false;
-	bool bROption = false;
 	bool bIOption = false;
-	bool bQOption = false;
 	bool bOOption = false;
 
 	struct option long_options[] =
 	{
 		{"bamFile", 		1, 0, 'b'},		//0
-		{"bamFileN",		1, 0, 'n'},
-		{"refFile",			1, 0, 'r'},		//1
 		{"input",			1, 0, 'i'},		//3
 		{"output",			1, 0, 'o'},
-		{"input format",	1, 0, 'f'},		//4	
+		{"modigy",			1, 0, 'm'},		//4	
 		{"num_thread", 		1, 0, 't'},		//8
 		{0, 0, 0, 0}
 	};
@@ -140,7 +132,7 @@ int parse_opt(const int argc, char **argv, int &nStatus, string &sBamFile, strin
 	while (1) 
 	{   
 		int option_index = 0;
-		c = getopt_long(argc, argv, "b:n:r:i:o:f:t:q", long_options, &option_index);
+		c = getopt_long(argc, argv, "b:i:o:t:mq", long_options, &option_index);
 		if (c == -1)    break;
 		char *pcEnd;
 		switch (c) 
@@ -149,13 +141,8 @@ int parse_opt(const int argc, char **argv, int &nStatus, string &sBamFile, strin
 				bBOption = true;
 				sBamFile = optarg;
 				break;
-			case 'n':
-				bNOption = true;
-				sBamFileN = optarg;
-				break;
-			case 'r':
-				bROption = true;
-				sRefFile = optarg;
+			case 'm':
+				bIsMod = true;
 				break;
 			case 'i':
 				bIOption = true;
@@ -164,14 +151,6 @@ int parse_opt(const int argc, char **argv, int &nStatus, string &sBamFile, strin
 			case 'o':
 				bOOption = true;
 				sOutputFile = optarg;
-				break;
-			case 'f':
-				/*
-				if((string)optarg == "VCF")			nStatus = 1;
-				else if((string)optarg == "ADIscan")	nStatus = 2;
-				else if((string)optarg == "VARscan")	nStatus = 3;
-				else							nStatus = 0;
-				*/
 				break;
 			case 't':
 				nCntThread = strtol(optarg, &pcEnd, 10);
@@ -182,7 +161,7 @@ int parse_opt(const int argc, char **argv, int &nStatus, string &sBamFile, strin
 		}
 	}
 
-	if(!bBOption || !bROption || !bIOption || !bOOption)		nStatus = 0;
+	if(!bBOption || !bIOption || !bOOption)		nStatus = 0;
 	return true;
 }
 

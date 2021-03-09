@@ -1,5 +1,5 @@
-#ifndef PILE_UP_H_
-#define PILE_UP_H_
+#ifndef __VAR_INFO_H__
+#define __VAR_INFO_H__
 
 #include <iostream>
 #include <sstream>
@@ -28,56 +28,19 @@
 
 using namespace std;
 
-class CRD;
+class CINFO;
 
-struct DIST_THREAD
-{
-	CRD *RD;
-	int nId;
-	int nSIdx;
-	int nEIdx;
-};
-
-
-struct VCF
-{
-	//raw data
-	vector<string> vsHeader;
-	string sFormat;
-	vector<string> vsChr;
-	vector<int>	vnPos;
-	vector<string> vsId;
-	vector<string> vsRef;
-	vector<string> vsAlt;
-	vector<string> vsQual;
-	vector<string> vsFilter;
-	vector<string> vsInfo;
-	vector<string> vsEtc;
-	
-};
-
-struct RDscan
-{
-	vector<double> vdCorr;			//pearson corr
-	vector<double> vdPval;		//pvalue
-	vector<double> vdVafT;
-	vector<double> vdVafN;
-	vector<int> vnVarT;
-	vector<int> vnVarN;
-};
-
-class CRD
+class CINFO
 {
 public:
 	bool m_bIsDebug;
-	int m_nStatus;				//1:vcf, 2:adiscan, 3:strelka, 4:varscan
 	string m_sBamFile;
-	string m_sBamFileN;
-	string m_sRefFile;
+	bool m_bIsMod;
 	string m_sInputFile;
 	string m_sOutputFile;
 	int m_nCntThread;
 
+/*
 	CFA_FILE m_FaFile;			//reference file
 	
 	RDscan m_rdscan;			//rdscan (output)
@@ -87,9 +50,9 @@ public:
 	clock_t m_clockEnd;
 	struct timespec m_tspecStart;
 	struct timespec m_tspecEnd;
-
+*/
 public:
-	CRD(int, string, string, string, string, string, int, bool);
+	CINFO(string, string, string, bool, int, bool);
 	bool ReadInput();
 	bool CalcDist();
 	bool Report();
@@ -97,6 +60,7 @@ public:
 	int PrintCommonInfo();
 
 private:
+/*
 	// input
 	VCF m_vcf;
 	//ADIscan m_adiscan;
@@ -143,7 +107,48 @@ private:
 	string to_string(unsigned long);
 	string to_string(uint16_t);
 	string to_string(double);
+*/
 };
+
+
+/*
+struct DIST_THREAD
+{
+	CRD *RD;
+	int nId;
+	int nSIdx;
+	int nEIdx;
+};
+
+
+struct VCF
+{
+	//raw data
+	vector<string> vsHeader;
+	string sFormat;
+	vector<string> vsChr;
+	vector<int>	vnPos;
+	vector<string> vsId;
+	vector<string> vsRef;
+	vector<string> vsAlt;
+	vector<string> vsQual;
+	vector<string> vsFilter;
+	vector<string> vsInfo;
+	vector<string> vsEtc;
+	
+};
+
+struct RDscan
+{
+	vector<double> vdCorr;			//pearson corr
+	vector<double> vdPval;		//pvalue
+	vector<double> vdVafT;
+	vector<double> vdVafN;
+	vector<int> vnVarT;
+	vector<int> vnVarN;
+};
+*/
+
 
 
 #endif

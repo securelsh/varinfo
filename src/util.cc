@@ -1,24 +1,26 @@
-#include "../header/rdscan.h"
+#include "../header/varinfo.h"
 pthread_mutex_t mutex_util = PTHREAD_MUTEX_INITIALIZER;
 
-int CRD::PrintCommonInfo()
+int CINFO::PrintCommonInfo()
 {
 	cout << "####################################" << endl;
-	cout << "## RDscan v1.0.1 (30 Sep 2020)    ##" << endl;
-	cout << "## (C) 2019-2020 Syntekabio Inc.  ##" << endl;
+	cout << "## VARinfo v0.0.1 (31 Mar 2021)   ##" << endl;
+	cout << "## (C) 2021-2022 Syntekabio Inc.  ##" << endl;
 	cout << "####################################" << endl;
 
 	cout << endl;
 	cout << "[INPUT Files]" << endl;
-	cout << "- Vcf File   : " << m_sInputFile << endl;
-	cout << "- Out File   : " << m_sOutputFile << endl;
-	cout << "- Bam File   : " << m_sBamFile << endl;
-	if(m_sBamFileN != "")	cout << "- Normal Bam : " << m_sBamFileN << endl;
-	cout << "- Reference  : " << m_sRefFile << endl;
+	cout << "- Input File   : " << m_sInputFile << endl;
+	cout << "- Output File  : " << m_sOutputFile << endl;
+	cout << "- Bam File     : " << m_sBamFile << endl;
+	cout << "[OPTIONs]" << endl;
+	cout << "- # of threads : " << m_nCntThread;
+	if(m_bIsMod)	cout << "- Consecutive SNP to Indel" << endl;
 
 	return 0;
 }
 
+/*
 bool CRD::Parsing(vector<string> &vsWord, string sLine, string sSep)
 {
 	char *pcEnd;
@@ -112,3 +114,4 @@ int CRD::ViewStatus(int nCurr, int nTotal, string sId, bool bIsNoDel)
 
 	return 0;
 }
+*/
