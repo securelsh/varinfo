@@ -80,10 +80,12 @@ int main(int argc, char* argv[])
 			cout << endl;
  
 			//read files (ref, input)
-			//RD.ReadInput();
-			
+			INFO.ReadInput();
+		
+			if(bIsMod)		INFO.ModVariant();
+
 			//calculate read distribution
-			//RD.CalcDist();		
+			INFO.CalcInfo();		
 			
 			//report
 			//RD.Report();
@@ -106,7 +108,7 @@ int main(int argc, char* argv[])
 	}
 
 
-	return true;
+	return false;
 }
 
 

@@ -14,14 +14,14 @@ int CINFO::PrintCommonInfo()
 	cout << "- Output File  : " << m_sOutputFile << endl;
 	cout << "- Bam File     : " << m_sBamFile << endl;
 	cout << "[OPTIONs]" << endl;
-	cout << "- # of threads : " << m_nCntThread;
+	cout << "- # of threads : " << m_nCntThread << endl;
 	if(m_bIsMod)	cout << "- Consecutive SNP to Indel" << endl;
 
 	return 0;
 }
 
-/*
-bool CRD::Parsing(vector<string> &vsWord, string sLine, string sSep)
+
+bool CINFO::Parsing(vector<string> &vsWord, string sLine, string sSep)
 {
 	char *pcEnd;
 	unsigned long ulMarker;
@@ -38,7 +38,7 @@ bool CRD::Parsing(vector<string> &vsWord, string sLine, string sSep)
 }
 
 
-string CRD::to_string(uint16_t nNum)
+string CINFO::to_string(uint16_t nNum)
 {
 	stringstream ss;
 	ss << nNum;
@@ -46,21 +46,21 @@ string CRD::to_string(uint16_t nNum)
 }
 
 
-string CRD::to_string(int nNum)
+string CINFO::to_string(int nNum)
 {
 	stringstream ss;
 	ss << nNum;
 	return ss.str();
 }
 
-string CRD::to_string(unsigned long ulNum)
+string CINFO::to_string(unsigned long ulNum)
 {
 	stringstream ss;
 	ss << ulNum;
 	return ss.str();
 }
 
-string CRD::to_string(double dNum)
+string CINFO::to_string(double dNum)
 {
 	stringstream ss;
 	ss << dNum;
@@ -68,7 +68,7 @@ string CRD::to_string(double dNum)
 }
 
 //////////////////////////////////////////// Loading view ////////////////////////////////
-int CRD::ViewStatus(int nCurr, int nTotal, string sId, bool bIsNoDel)
+int CINFO::ViewStatus(int nCurr, int nTotal, string sId, bool bIsNoDel)
 {
 	//m_clockEnd = clock();
 	clock_gettime(CLOCK_REALTIME, &m_tspecEnd);
@@ -114,4 +114,4 @@ int CRD::ViewStatus(int nCurr, int nTotal, string sId, bool bIsNoDel)
 
 	return 0;
 }
-*/
+

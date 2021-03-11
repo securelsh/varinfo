@@ -1,4 +1,4 @@
-#include "../header/rdscan.h"
+#include "../header/varinfo.h"
 #include <math.h>
 
 
@@ -7,15 +7,15 @@ pthread_mutex_t mutex_filter = PTHREAD_MUTEX_INITIALIZER;
 using namespace std;
 
 
-
-bool CRD::CalcDist()
+//get information
+bool CINFO::CalcInfo()
 {
 	//parallel process
 	vector<DIST_THREAD> vDistThread;
 	for(int i=0; i<m_nCntThread; i++)
 	{   
 		DIST_THREAD DistThread;
-		DistThread.RD = this;
+		DistThread.INFO = this;
 		DistThread.nId = i;
 		vDistThread.push_back(DistThread);
 	}
@@ -32,71 +32,41 @@ bool CRD::CalcDist()
 	return true;
 }
 
-void* CRD::AlleleDist(int nId)
+
+void* CINFO::AlleleDist(int nId)
 {
 
 	//open bam
-	bamFile finBam, finBamN;
+	bamFile finBam;
 	finBam = bam_open(m_sBamFile.c_str(), "r");
 	if(finBam == NULL)	throw std::logic_error("ERROR: Can not open .bam file");
 
-	bam_header_t *bamHeader, *bamHeaderN;
+	bam_header_t *bamHeader;
 	bamHeader = bam_header_read(finBam);
 	if(!bamHeader)       throw std::logic_error("ERROR: Fail to read the header of a bam file");
 
-	bam_index_t *bamIndex, *bamIndexN;
+	bam_index_t *bamIndex;
 	bamIndex = bam_index_load(m_sBamFile.c_str());
 	if(!bamIndex)      throw std::logic_error("ERROR: Fail to read .bai file");
 
-	if(m_sBamFileN != "")
-	{
-		finBamN = bam_open(m_sBamFileN.c_str(), "r");
-		if(finBamN == NULL)	throw std::logic_error("ERROR: Can not open .bam file");
-
-		bamHeaderN = bam_header_read(finBamN);
-		if(!bamHeaderN)       throw std::logic_error("ERROR: Fail to read the header of a bam file");
-
-		bamIndexN = bam_index_load(m_sBamFileN.c_str());
-		if(!bamIndexN)      throw std::logic_error("ERROR: Fail to read .bai file");
-	}
-
-
-	//calc dist
-	int nCnt = 0;
-	int nSubCnt = (int)m_rdscan.vdCorr.size()/m_nCntThread;
-	int nExtra = (int)m_rdscan.vdCorr.size()%m_nCntThread;
+	//calc info
+	int nSubCnt = (int)m_Input.vsChr.size()/m_nCntThread;
+	int nExtra = (int)m_Input.vsChr.size()%m_nCntThread;
 	if(nId < nExtra)	nSubCnt++;
+
+	//TODO: allocate a structure
 	
-	for(int i=nId; i<(int)m_rdscan.vdCorr.size(); i+=m_nCntThread)
+
+
+	for(int i=nId; i<(int)m_Input.vsChr.size(); i+=m_nCntThread)
 	{
-		nCnt++;
-
-
-		///////////////// get variants info. //////////////////////////
+		string sChr, sRef, sAlt;
 		int nChr, nPos;
-		string sChr, sRef, sAlt, sAlt1="", sAlt2="";
-		if(m_nStatus == 1)				// vcf
-		{
-			sChr = m_vcf.vsChr[i];
-			nPos = m_vcf.vnPos[i];
-			sRef = m_vcf.vsRef[i];
-			sAlt = m_vcf.vsAlt[i];
-			vector<string> vsWord;
-			Parsing(vsWord, sAlt, ",");
-			if(vsWord.size() > 1)
-			{
-				sAlt1 = vsWord[0];
-				sAlt2 = vsWord[1];
-				sAlt = sAlt1;
-				if(sRef.size() == 1 && sAlt1.size() < sAlt2.size())		sAlt = sAlt2;
-				if(sRef.size() > 1 && sAlt1.size() > sAlt2.size())		sAlt = sAlt2;
-			}
-		}
-		string sPrint = "Calculate RDscore by Thread_" + this->to_string(nId+1) + " - " + sChr + ":" + this->to_string(nPos);
-		if(nCnt==1 || nCnt%1000==0 )	this->ViewStatus(nCnt, nSubCnt, sPrint);
-		if(nCnt==nSubCnt)				this->ViewStatus(nCnt, nSubCnt, sPrint, true);
-	
 		
+		sChr = m_Input.vsChr[i];
+		sRef = m_Input.vsRef[i];
+		sAlt = m_Input.vsAlt[i];
+		nPos = m_Input.vnPos[i];
 		nChr = ConvertChrToTid(sChr, bamHeader);
 		if(nChr == -1)
 		{
@@ -104,18 +74,22 @@ void* CRD::AlleleDist(int nId)
 			throw std::logic_error("Not available Chr");
 		}
 		
-		// Check Repeat
-		int nRepeatCnt = 1;
-		int nRepeatLastLen = 0;
-		if(m_FaFile.GetRefIdx(sChr) == -1 || !CheckRepeat(sRef, sAlt, sChr, nPos, nRepeatCnt, nRepeatLastLen))
-		{
-			m_rdscan.vdCorr[i] = -1;
-			continue;
-		}
+		//Main function
+		this->GetVarInfo(i, sChr, nChr, nPos, sRef, sAlt);
 
+	}
 
-		///////////////// calc allele distribution ////////////////////
-		
+	bam_close(finBam);
+	
+	return (void*)1;
+
+}
+
+//TODO: fill variant info to VARIANT struct
+bool CINFO::GetVarInfo(int nIdx, string sChr, int nChr, int nPos, string sRef, string sAlt)
+{
+/*
+
 		int nPivotSPos = -1;
 		int nPivotSPosN = -1;
 		vector<int> vnNorSPos, vnNorEPos, vnVarSPos, vnVarEPos;
@@ -128,109 +102,15 @@ void* CRD::AlleleDist(int nId)
 		if(m_sBamFileN != "")	AlleleCount(bamIndexN, finBamN, nChr, nPos, sRef, sAlt, nRepeatCnt, nRepeatLastLen, nPivotSPosN, vnNorSPosN, vnNorEPosN, vnVarSPosN, vnVarEPosN, vsNorSeqN, vsVarSeqN);
 	
 
-		///////////////// filter read ////////////////////////////////
-		int nSumNor,nSumVar,nSumNorN,nSumVarN;
-		int nCntNor, nCntVar, nCntNorN, nCntVarN;
-
-		FilterRead(sChr,vnNorSPos,vnNorEPos,vnVarSPos,vnVarEPos,vsNorSeq, vsVarSeq, nSumNor, nSumVar, nCntNor, nCntVar);
-		if(m_sBamFileN != "")	FilterRead(sChr,vnNorSPosN,vnNorEPosN,vnVarSPosN,vnVarEPosN,vsNorSeqN,vsVarSeqN,nSumNorN,nSumVarN,nCntNorN,nCntVarN);
+		*/
 
 
-		double dAveVarReadLen = (double)nSumVar/(double)nCntVar;
-		double dAveNorReadLen = (double)nSumNor/(double)nCntNor;
-		
-		double dAveVarReadLenN, dAveNorReadLenN;
-		if(m_sBamFileN != "")	dAveVarReadLenN = (double)nSumVarN/(double)nCntVarN;
-		if(m_sBamFileN != "")	dAveNorReadLenN = (double)nSumNorN/(double)nCntNorN;
-		
-		
-//		if(m_bIsDebug)	cout << sChr << ":" << nPos << "\t" << vnVarSPos.size() << "/" << vnNorSPos.size()+vnVarSPos.size() <<endl;
-		
-
-
-		/////////////////// calculate depth //////////////////////////
-		int anAllDp[1000] = {0,};
-		int anVarDp[1000] = {0,};
-		int anAllDpN[1000] = {0,};
-		int anVarDpN[1000] = {0,};
-		
-		for(int j=0; j<vnNorSPos.size(); j++)
-		{
-			for(int k=vnNorSPos[j]-nPivotSPos; k<=vnNorEPos[j]-nPivotSPos; k++)		anAllDp[k]++;
-		}
-		for(int j=0; j<vnVarSPos.size(); j++)
-		{
-			for(int k=vnVarSPos[j]-nPivotSPos; k<=vnVarEPos[j]-nPivotSPos; k++)		anVarDp[k]++;
-			for(int k=vnVarSPos[j]-nPivotSPos; k<=vnVarEPos[j]-nPivotSPos; k++)		anAllDp[k]++;
-		}
-
-		if(m_sBamFileN != "")
-		{
-			for(int j=0; j<vnNorSPosN.size(); j++)
-			{
-				for(int k=vnNorSPosN[j]-nPivotSPosN; k<=vnNorEPosN[j]-nPivotSPosN; k++)		anAllDpN[k]++;
-			}
-			for(int j=0; j<vnVarSPosN.size(); j++)
-			{
-				for(int k=vnVarSPosN[j]-nPivotSPosN; k<=vnVarEPosN[j]-nPivotSPosN; k++)		anVarDpN[k]++;
-				for(int k=vnVarSPosN[j]-nPivotSPosN; k<=vnVarEPosN[j]-nPivotSPosN; k++)		anAllDpN[k]++;
-			}
-		}
-
-	
-
-		///////////////// calc correlation between all & variants ////////////////////
-		double dCorr, dPval;
-		double dCorrN=0, dPvalN=0;
-		double dSignificant = 1;
-		double dTVaf = 0, dNVaf = 0;
-		
-		// calc correlation
-		CalcPearsonCorr(anAllDp, anVarDp, dCorr, dPval);
-		double dCoef = 1;
-//		if(dTVaf < 0.1)		dCoef = CalcCoef(sChr, vsSeq, vnVarSPos, vnVarEPos);		//calc coef
-		m_rdscan.vdCorr[i] = dCoef * dCorr;
-		
-
-//		if(m_bIsDebug)	cout << "SCORE:" << "\t" << m_rdscan.vdCorr[i] << endl;
-
-		////////////////// minus control corr ////////////////////////////
-		if(vnNorSPos.size()+vnVarSPos.size() != 0)	
-			dTVaf = (double)max(0,(int)vnVarSPos.size()) / ((double)vnNorSPos.size()+(double)vnVarSPos.size());
-
-		
-		if(m_sBamFileN != "")
-		{
-			CalcPearsonCorr(anAllDpN, anVarDpN, dCorrN, dPvalN);
-			if(vnNorSPosN.size()+vnVarSPosN.size() != 0)	
-				dNVaf = (double)max(0,(int)vnVarSPosN.size()) / ((double)vnNorSPosN.size()+(double)vnVarSPosN.size());
-			if(dTVaf != 0)							dSignificant = dNVaf/dTVaf;
-
-			dCoef = 1;
-//			if(dNVaf < 0.1)		dCoef = CalcCoef(sChr, vsSeqN, vnVarSPosN, vnVarEPosN);			
-			m_rdscan.vdCorr[i] = max(0.0, m_rdscan.vdCorr[i] - dSignificant*dCoef*dCorrN);
-		}
-		
-
-
-		if(dTVaf < 0.2)		m_rdscan.vdCorr[i] = m_rdscan.vdCorr[i] * 0.1 * min((int)vnVarSPos.size(),10);
-		
-		m_rdscan.vdCorr[i] = min(1.0, m_rdscan.vdCorr[i]);
-		m_rdscan.vdCorr[i] = max(0.0, m_rdscan.vdCorr[i]);
-
-		
-		m_rdscan.vdVafT[i] = dTVaf;
-		m_rdscan.vdVafN[i] = dNVaf;
-		m_rdscan.vnVarT[i] = vnVarSPos.size();
-		m_rdscan.vnVarN[i] = vnVarSPosN.size();
-		
-	}
-	bam_close(finBam);
-	if(m_sBamFileN != "")		bam_close(finBamN);
-	
-
+	return false;
 }
 
+
+
+/*
 
 bool CRD::FilterRead(string sChr, vector<int> &vnNorSPos, vector<int> &vnNorEPos, 
 		vector<int> &vnVarSPos, vector<int> &vnVarEPos,
@@ -410,67 +290,8 @@ bool CRD::FilterRead(string sChr, vector<int> &vnNorSPos, vector<int> &vnNorEPos
 	nCntVar = vnVarSPosT.size();
 	return true;
 }
-
+*/
 /*
-double CRD::CalcCoef(string sChr, vector<string> &vsSeq, vector<int> &vnSPos, vector<int> &vnEPos)
-{
-	double dCoef = 0;
-
-	int nPivotSPos = -1;
-	int nPivotEPos = -1;
-	for(int i=0; i<vnSPos.size(); i++)
-	{
-		if(nPivotSPos == -1 || vnSPos[i] < nPivotSPos)	nPivotSPos = vnSPos[i];
-		if(nPivotEPos == -1 || vnEPos[i] > nPivotEPos)	nPivotEPos = vnEPos[i];
-	}
-
-	if(nPivotSPos == -1 || nPivotEPos == -1)	return dCoef;
-	if(vnSPos.size() <= 1)						return dCoef;
-
-	string sRefSeq;
-	if(!m_FaFile.GetSeq(sRefSeq, sChr, nPivotSPos, nPivotEPos))		return -1;
-	
-	int pnA[500] = {0,};
-	int pnC[500] = {0,}; 
-	int pnG[500] = {0,}; 
-	int pnT[500] = {0,}; 
-	int pnAll[500] = {0,};
-
-	for(int i=0; i<vnSPos.size(); i++)
-	{
-		for(int j=vnSPos[i]; j<=vnEPos[i]; j++)
-		{
-			int nPos = j-nPivotSPos;
-			if(vsSeq[i][j-vnSPos[i]] == 'A')		pnA[nPos]++;
-			if(vsSeq[i][j-vnSPos[i]] == 'C')		pnC[nPos]++;
-			if(vsSeq[i][j-vnSPos[i]] == 'G')		pnG[nPos]++;
-			if(vsSeq[i][j-vnSPos[i]] == 'T')		pnT[nPos]++;
-			pnAll[nPos]++;
-		}
-	}
-	
-	for(int i=0; i<vnSPos.size(); i++)
-	{
-		double dReadQual = 1;
-		for(int j=vnSPos[i]; j<=vnEPos[i]; j++)
-		{
-			int nPos = j-nPivotSPos;
-			if(vsSeq[i][j-vnSPos[i]] == sRefSeq[nPos])		continue;
-			if(pnAll[nPos] < 4)								continue;
-
-			if(vsSeq[i][j-vnSPos[i]] == 'A')		dReadQual *= 0.5 + (double)pnA[nPos]/(double)pnAll[nPos];
-			if(vsSeq[i][j-vnSPos[i]] == 'C')		dReadQual *= 0.5 + (double)pnC[nPos]/(double)pnAll[nPos];
-			if(vsSeq[i][j-vnSPos[i]] == 'G')		dReadQual *= 0.5 + (double)pnG[nPos]/(double)pnAll[nPos];
-			if(vsSeq[i][j-vnSPos[i]] == 'T')		dReadQual *= 0.5 + (double)pnT[nPos]/(double)pnAll[nPos];
-		}
-		dReadQual /= (double)vnSPos.size();
-		dCoef += dReadQual;
-	}
-	if(dCoef > 2)	dCoef = 2;
-	return dCoef;
-}*/
-
-
 bool CRD::AlleleCount(bam_index_t *bamIndex, bamFile &finBam, 
 		int nChr, int nPos, string sRef, string sAlt, int nRepeatCnt, int nRepeatLastLen, int &nPivotSPos, 
 		vector<int> &vnNorSPos, vector<int> &vnNorEPos, vector<int> &vnVarSPos, vector<int> &vnVarEPos, 
@@ -531,83 +352,6 @@ bool CRD::AlleleCount(bam_index_t *bamIndex, bamFile &finBam,
 	return true;
 }
 
-
-bool CRD::CheckRepeat(string sRef, string sAlt, string sChr, int nPos, int &nRepeatCnt, int &nRepeatLastLen)
-{
-	if(sRef.size() == sAlt.size())
-	{
-		nRepeatCnt = 1;
-		nRepeatLastLen = 0;
-	}
-	else if(sRef.size() > sAlt.size())		//deletion
-	{
-		int nSizeDiff = sRef.size()-sAlt.size();
-		string sOrigin = "";
-		bool bIsGetRefSeq = m_FaFile.GetSeq(sOrigin, sChr, nPos+1, nPos+nSizeDiff);
-		if(!bIsGetRefSeq)		return false;
-
-		nRepeatCnt = 1;
-		nRepeatLastLen = 0;
-		while(1)
-		{
-			nRepeatLastLen = 0;
-			bool bIsConsecutiveRepeat = true;
-			string sNextSeq = "";
-			bIsGetRefSeq = m_FaFile.GetSeq(sNextSeq, sChr, nPos+1+nSizeDiff*nRepeatCnt, nPos+nSizeDiff*(nRepeatCnt+1));
-			if(!bIsGetRefSeq)		return false;
-			int nDiff = 0;
-			int nSame = 0;
-
-			for(int i=0; i<nSizeDiff; i++)
-			{
-				if(sOrigin[i] == sNextSeq[i])	nSame++;
-				else							nDiff++;
-				
-				if(bIsConsecutiveRepeat)	
-				{
-					if(sOrigin[i] == sNextSeq[i])	nRepeatLastLen++;
-					else							bIsConsecutiveRepeat = false;
-				}
-			}
-			if((double)nDiff/(double)(nSame+nDiff) > 0.33)		break;
-			nRepeatCnt++;
-		}
-	}
-	else if(sRef.size() < sAlt.size())		//insertion
-	{
-		int nSizeDiff = sAlt.size() - sRef.size();
-		string sOrigin = sAlt.substr(sRef.size());
-		
-		nRepeatCnt = 1;
-		nRepeatLastLen = 0;
-		while(1)
-		{
-			nRepeatLastLen = 0;
-			bool bIsConsecutiveRepeat = true;
-			string sNextSeq = "";
-			bool bIsGetRefSeq = m_FaFile.GetSeq(sNextSeq, sChr, nPos+1+nSizeDiff*nRepeatCnt, nPos+nSizeDiff*(nRepeatCnt+1));
-			if(!bIsGetRefSeq)		return false;
-
-			int nDiff = 0;
-			int nSame = 0;
-
-			for(int i=0; i<nSizeDiff; i++)
-			{
-				if(sOrigin[i] == sNextSeq[i])	nSame++;
-				else							nDiff++;
-				
-				if(bIsConsecutiveRepeat)	
-				{
-					if(sOrigin[i] == sNextSeq[i])	nRepeatLastLen++;
-					else							bIsConsecutiveRepeat = false;
-				}
-			}
-			if((double)nDiff/(double)(nSame+nDiff) > 0.33)		break;
-			nRepeatCnt++;
-		}
-	}
-	return true;
-}
 
 bool CRD::CalcPearsonCorr(int *pnAllDp, int *pnVarDp, double &dCorr, double &dPval)
 {
@@ -814,7 +558,11 @@ bool CRD::GetReadAlign(int &nSPos, int &nEPos, string &sSeq, int nPos, string sR
 }
 
 
-int CRD::ConvertChrToTid(string sChr, bam_header_t* bamHeader)
+
+
+*/
+
+int CINFO::ConvertChrToTid(string sChr, bam_header_t* bamHeader)
 {
 	int nId = -1;
 	for(int i=0; i<(int)bamHeader->n_targets; i++)
@@ -827,10 +575,6 @@ int CRD::ConvertChrToTid(string sChr, bam_header_t* bamHeader)
 	}
 	return nId;
 }
-
-
-
-
 
 
 
