@@ -30,6 +30,32 @@ using namespace std;
 
 class CINFO;
 
+struct VARIANT
+{
+	//raw data
+	vector<string> vsHeader;
+	
+	vector<bool> vbIsVcf;
+	vector<string> vsChr;
+	vector<int>	vnPos;
+	vector<string> vsRef;
+	vector<string> vsAlt;
+	
+	vector<string> vsRaw;
+
+	//TODO:information
+	
+
+};
+
+struct DIST_THREAD
+{
+	CINFO *INFO;
+	int nId;
+};
+
+
+
 class CINFO
 {
 public:
@@ -40,46 +66,36 @@ public:
 	string m_sOutputFile;
 	int m_nCntThread;
 
-/*
-	CFA_FILE m_FaFile;			//reference file
-	
-	RDscan m_rdscan;			//rdscan (output)
+	//RDscan m_rdscan;			//rdscan (output)
 
 	//for util
 	clock_t m_clockStart;
 	clock_t m_clockEnd;
 	struct timespec m_tspecStart;
 	struct timespec m_tspecEnd;
-*/
 public:
 	CINFO(string, string, string, bool, int, bool);
 	bool ReadInput();
-	bool CalcDist();
-	bool Report();
+	bool ModVariant();
+	bool CalcInfo();
+	//bool Report();
 	
 	int PrintCommonInfo();
 
 private:
-/*
 	// input
-	VCF m_vcf;
-	//ADIscan m_adiscan;
-	//VARscan m_varscan;
-
-
-	// read input files
-	bool ReadVcf();
-//	bool ReadAdiscan();
-//	bool ReadVarscan();
+	VARIANT m_Input;
 	
-	// calc dist
+	// calc info
 	void* AlleleDist(int);
 	static void *AlleleDist_helper(void *object)
 	{
 		DIST_THREAD *my = (DIST_THREAD*)object;
-		my->RD->AlleleDist(my->nId);
+		my->INFO->AlleleDist(my->nId);
 	}
+	bool GetVarInfo(int, string, int, int, string, string);
 	int ConvertChrToTid(string, bam_header_t*);
+/*
 	bool GetReadAlign(int &, int &, string &, int, string, string, bam1_t*);
 	bool CheckRepeat(string, string, string, int, int &, int &);
 	bool AlleleCount(bam_index_t *, bamFile &, int, int, string, string, int, int, int &, vector<int> &, vector<int> &, vector<int> &, vector<int> &, vector<string> &, vector<string> &);
@@ -91,7 +107,7 @@ private:
 //	bool ReportAdiscan();
 //	bool ReportVarscan();
 
-
+*/
 	// library
 	bool Parsing(vector<string> &, string, string);
 	bool CalcPearsonCorr(int*, int*, double&, double&);
@@ -107,47 +123,10 @@ private:
 	string to_string(unsigned long);
 	string to_string(uint16_t);
 	string to_string(double);
-*/
+
 };
 
 
-/*
-struct DIST_THREAD
-{
-	CRD *RD;
-	int nId;
-	int nSIdx;
-	int nEIdx;
-};
-
-
-struct VCF
-{
-	//raw data
-	vector<string> vsHeader;
-	string sFormat;
-	vector<string> vsChr;
-	vector<int>	vnPos;
-	vector<string> vsId;
-	vector<string> vsRef;
-	vector<string> vsAlt;
-	vector<string> vsQual;
-	vector<string> vsFilter;
-	vector<string> vsInfo;
-	vector<string> vsEtc;
-	
-};
-
-struct RDscan
-{
-	vector<double> vdCorr;			//pearson corr
-	vector<double> vdPval;		//pvalue
-	vector<double> vdVafT;
-	vector<double> vdVafN;
-	vector<int> vnVarT;
-	vector<int> vnVarN;
-};
-*/
 
 
 
