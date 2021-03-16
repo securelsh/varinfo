@@ -14,7 +14,7 @@ using namespace std;
   -- fill variant info to VARIANT struct
   
 - Changelog:
-  -- Date Mar-16-2021 SeokCholHong
+  -- Date Mar-16-2021 SeokCholHong shulkhorn@gmail.com
      --- Extract information from BAM file
 
 */
