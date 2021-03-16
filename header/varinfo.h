@@ -30,6 +30,24 @@ using namespace std;
 
 class CINFO;
 
+struct QCINFO
+{
+	float fVaf;
+	float fStrandBias;
+	vector<int> nReadLen;
+	vector<uint8_t> nMapQ; // mapping quality
+	vector<uint8_t> nBaseQ; // base quality
+	uint16_t nReverse;
+	uint16_t nDepthA;
+	uint16_t nDepthC;
+	uint16_t nDepthG;
+	uint16_t nDepthT;
+	uint16_t nDepthIndel;
+	QCINFO(){
+		nReverse = nDepthA = nDepthC = nDepthG = nDepthT = nDepthIndel = 0;
+	}
+};
+
 struct VARIANT
 {
 	//raw data
@@ -43,8 +61,10 @@ struct VARIANT
 	
 	vector<string> vsRaw;
 
+
+
 	//TODO:information
-	
+	QCINFO QcInfo;
 
 };
 
@@ -87,13 +107,16 @@ private:
 	VARIANT m_Input;
 	
 	// calc info
+	bool GetStrandBias(QCINFO &);
+	bool GetVaf(QCINFO &);
+	bool GetNb(bam1_t *, int, QCINFO &);
 	void* AlleleDist(int);
 	static void *AlleleDist_helper(void *object)
 	{
 		DIST_THREAD *my = (DIST_THREAD*)object;
 		my->INFO->AlleleDist(my->nId);
 	}
-	bool GetVarInfo(int, string, int, int, string, string);
+	bool GetVarInfo(int, string, int, int, string, string, bam_index_t *, bamFile);
 	int ConvertChrToTid(string, bam_header_t*);
 /*
 	bool GetReadAlign(int &, int &, string &, int, string, string, bam1_t*);
@@ -114,7 +137,7 @@ private:
 
 	//util
 	void SetStartTime()
-	{		
+	{
 		//m_clockStart = clock();
 		clock_gettime(CLOCK_REALTIME, &m_tspecStart);
 	};

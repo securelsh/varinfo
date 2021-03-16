@@ -7,9 +7,25 @@ pthread_mutex_t mutex_filter = PTHREAD_MUTEX_INITIALIZER;
 using namespace std;
 
 
+/*
+
+- To Do:
+  -- make method for estimation of strand bias & VAF
+  -- fill variant info to VARIANT struct
+  
+- Changelog:
+  -- Date Mar-16-2021 SeokCholHong
+     --- Extract information from BAM file
+
+*/
+
+
+
 //get information
 bool CINFO::CalcInfo()
 {
+	if(m_bIsDebug) cout << "- CINFO::CalcInfo()" << endl;
+	
 	//parallel process
 	vector<DIST_THREAD> vDistThread;
 	for(int i=0; i<m_nCntThread; i++)
@@ -35,7 +51,6 @@ bool CINFO::CalcInfo()
 
 void* CINFO::AlleleDist(int nId)
 {
-
 	//open bam
 	bamFile finBam;
 	finBam = bam_open(m_sBamFile.c_str(), "r");
@@ -75,7 +90,7 @@ void* CINFO::AlleleDist(int nId)
 		}
 		
 		//Main function
-		this->GetVarInfo(i, sChr, nChr, nPos, sRef, sAlt);
+		this->GetVarInfo(i, sChr, nChr, nPos, sRef, sAlt, bamIndex, finBam);
 
 	}
 
@@ -85,30 +100,172 @@ void* CINFO::AlleleDist(int nId)
 
 }
 
-//TODO: fill variant info to VARIANT struct
-bool CINFO::GetVarInfo(int nIdx, string sChr, int nChr, int nPos, string sRef, string sAlt)
+bool CINFO::GetVarInfo(int nIdx, string sChr, int nChr, int nPos, string sRef, string sAlt, bam_index_t *bamIndex, bamFile finBam)
 {
-/*
+	// read bam file
+	bam_iter_t bamIter;
+	bam1_t *b;
+	b = bam_init1();
+	bamIter = bam_iter_query(bamIndex, nChr, nPos-1, nPos);// nSPos<= locus <=nEPos
 
-		int nPivotSPos = -1;
-		int nPivotSPosN = -1;
-		vector<int> vnNorSPos, vnNorEPos, vnVarSPos, vnVarEPos;
-		vector<int> vnNorSPosN, vnNorEPosN, vnVarSPosN, vnVarEPosN;
-		vector<string> vsNorSeq, vsVarSeq;
-		vector<string> vsNorSeqN, vsVarSeqN;
-		
-		
-		AlleleCount(bamIndex, finBam, nChr, nPos, sRef, sAlt, nRepeatCnt, nRepeatLastLen, nPivotSPos, vnNorSPos, vnNorEPos, vnVarSPos, vnVarEPos, vsNorSeq, vsVarSeq);
-		if(m_sBamFileN != "")	AlleleCount(bamIndexN, finBamN, nChr, nPos, sRef, sAlt, nRepeatCnt, nRepeatLastLen, nPivotSPosN, vnNorSPosN, vnNorEPosN, vnVarSPosN, vnVarEPosN, vsNorSeqN, vsVarSeqN);
-	
+	QCINFO QcInfo;
+	int nRet;
+	while((nRet = bam_iter_read(finBam, bamIter, b)) >= 0){
+		GetNb(b, nPos - (b->core.pos+1), QcInfo);
+	}
+	GetStrandBias(QcInfo);
+	GetVaf(QcInfo);
 
-		*/
+	// if(QcInfo.nDepthIndel>0){
+	// 	cout << sChr << " " << nPos << " " << sRef << " " << sAlt << endl;
+	// 	cout << QcInfo.nReverse << " " << QcInfo.nDepthIndel << " " << QcInfo.nDepthA << " " << QcInfo.nDepthC << " " << QcInfo.nDepthG << " " << QcInfo.nDepthT << endl;
+	// 	for(unsigned int q=0;q<QcInfo.nMapQ.size();q++)
+	// 		cout << (int)QcInfo.nMapQ[q] << " ";
+	// 	cout << endl;
+	// 	for(unsigned int q=0;q<QcInfo.nBaseQ.size();q++)
+	// 		cout << (char)(QcInfo.nBaseQ[q]+33);
+	// 	cout << endl;
+	// 	exit(1);
+	// }
 
+	bam_iter_destroy(bamIter);
+	bam_destroy1(b);
 
 	return false;
 }
 
+bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
+{
+	//cigar
+	uint32_t nTemp=0;
+	int l,nPl,nPreAlgn;
+	for(l=b->core.l_qname, nPl=1, nPreAlgn = 0;
+		l<(b->core.l_qname + (b->core.n_cigar*4));
+		l++, nPl++){
+		int nChk = nPl%4;
+		if(nChk==0){
+			nTemp = (b->data[l]<<24) | nTemp;
 
+			int nAlgn = (nTemp>>4);//the higher 28 bits keep the length of a CIGAR
+			int op = nTemp&0xf;//the lower 4 bits gives a CIGAR operation
+			if(op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF){
+				nPreAlgn += nAlgn;
+				if(nPos<nPreAlgn)	break;
+			}
+			else if(op == BAM_CINS){//insertion
+				if(nPos<nPreAlgn)	break;
+				nPos += nAlgn;
+				nPreAlgn += nAlgn;
+			}
+			else if(op == BAM_CDEL){//deletion
+				if(nPreAlgn<=nPos && nPos<nPreAlgn+nAlgn){
+					return true;
+				}
+				else if(nPos>=nPreAlgn+nAlgn){
+					nPos -= nAlgn;
+				}
+				else if(nPos<nPreAlgn)	break;
+			}
+			else if(op == BAM_CSOFT_CLIP || op == BAM_CPAD){
+				//soft clip|padding
+				if(nPos<nPreAlgn)	break;
+				nPos += nAlgn;
+				nPreAlgn += nAlgn;
+			}
+			else if(op == BAM_CREF_SKIP){//skipping|spliced
+				if(nPos<nPreAlgn)	break;
+				nPos += nAlgn;
+				nPreAlgn += nAlgn;
+			}
+			else if(op == BAM_CHARD_CLIP){
+				//hard clipping
+			}
+		}
+		else if(nChk==1)	nTemp = b->data[l];
+		else if(nChk==2)	nTemp = (b->data[l]<<8) | nTemp;
+		else if(nChk==3)	nTemp = (b->data[l]<<16) | nTemp;
+	}
+	if(nPos>=b->core.l_qseq)	return 0;
+
+	// check indel
+	bool bIsIndel=false;
+	while(l<(b->core.l_qname + (b->core.n_cigar*4))){
+		l++, nPl++;
+		int nChk = nPl%4;
+		if(nChk==0){
+			nTemp = (b->data[l]<<24) | nTemp;
+			int op = nTemp&0xf;//the lower 4 bits gives a CIGAR operation
+			if(op == BAM_CINS || op == BAM_CDEL){
+				bIsIndel=true;
+			}
+		}
+		else if(nChk==1)	nTemp = b->data[l];
+		else if(nChk==2)	nTemp = (b->data[l]<<8) | nTemp;
+		else if(nChk==3)	nTemp = (b->data[l]<<16) | nTemp;
+	}
+
+	if(bIsIndel) {
+		BamInfo.nDepthIndel++;
+	} else {
+		// unsigned char ucBase = (b->data[(b->core.l_qname + (b->core.n_cigar*4))+(nPos>>1)] >> ((~nPos&1)<<2) & 0xf);
+		unsigned char ucBase = bam1_seqi(bam1_seq(b), nPos);
+		if     (ucBase == 0x01)	BamInfo.nDepthA++;
+		else if(ucBase == 0x02)	BamInfo.nDepthC++;
+		else if(ucBase == 0x04)	BamInfo.nDepthG++;
+		else if(ucBase == 0x08)	BamInfo.nDepthT++;
+		else if(ucBase == 0x0F)	return 0; //N : missing, no depth
+		else
+			throw std::logic_error("ERROR: sequence error. It deosn't belong to ACGTN (in function CCOMPDP::GetNb():64)");
+	}
+	// base quality
+	char *nBaseQual = (char*)calloc(b->core.l_qseq, 1);
+	memcpy(nBaseQual, bam1_qual(b), b->core.l_qseq);
+	BamInfo.nBaseQ.push_back(nBaseQual[nPos]);
+	// for(unsigned int qq=0;qq<b->core.l_qseq;qq++)
+	// 	cout << (char)(nBaseQual[qq]+33);
+	// cout << endl;
+
+	// mapping quality
+	BamInfo.nMapQ.push_back(b->core.qual);
+
+	// number of reverse strand
+	BamInfo.nReverse+=bam1_strand(b);
+
+	// // depth
+	// BamInfo.nDepth+=1;
+
+	return 1;
+}
+
+/*
+ -- Reference
+	Guo, Y., Li, J., Li, CI. et al. 
+	The effect of strand bias in Illumina short-read sequencing data.
+	BMC Genomics 13, 666 (2012). 
+	https://doi.org/10.1186/1471-2164-13-666
+
+	< Table 1 >
+	https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-13-666/tables/1
+*/
+bool CINFO::GetStrandBias(QCINFO &QcInfo){
+	float fStrandBias;
+	int nFR = 0; // Forward strand reference allele.
+	int nFA = 0; // Forward strand non reference allele.
+	int nRR = 0; // Reverse strand reference allele.
+	int nRA = 0; // Reverse strand non reference allele.
+
+	QcInfo.fStrandBias = fStrandBias;
+
+	return true;
+}
+
+bool CINFO::GetVaf(QCINFO &QcInfo){
+	float fVaf;
+
+	QcInfo.fVaf = fVaf;
+
+	return true;
+}
 
 /*
 

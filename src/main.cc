@@ -164,6 +164,7 @@ string &sInputFile, string &sOutputFile, bool &bIsMod, int &nCntThread, bool &bI
 	}
 
 	if(!bBOption || !bIOption || !bOOption)		nStatus = 0;
+	if(nCntThread<1) nCntThread = 1;
 	return true;
 }
 
