@@ -85,8 +85,8 @@ int main(int argc, char* argv[])
 			if(bIsMod)		INFO.ModVariant();
 
 			//calculate read distribution
-			INFO.CalcInfo();		
-			
+			INFO.CalcInfo();
+
 			//report
 			//RD.Report();
 		}
@@ -164,6 +164,7 @@ string &sInputFile, string &sOutputFile, bool &bIsMod, int &nCntThread, bool &bI
 	}
 
 	if(!bBOption || !bIOption || !bOOption)		nStatus = 0;
+	if(nCntThread<1) nCntThread = 1;
 	return true;
 }
 
