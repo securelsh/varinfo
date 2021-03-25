@@ -34,17 +34,22 @@ struct QCINFO
 {
 	float fVaf;
 	float fStrandBias;
-	vector<int> nReadLen;
-	vector<uint8_t> nMapQ; // mapping quality
-	vector<uint8_t> nBaseQ; // base quality
-	uint16_t nReverse;
-	uint16_t nDepthA;
-	uint16_t nDepthC;
-	uint16_t nDepthG;
-	uint16_t nDepthT;
-	uint16_t nDepthIndel;
+	vector<uint16_t> vnReadLen;
+	vector<uint8_t> vnMapQ;
+	vector<uint8_t> vnBaseQ;
+	uint16_t nFrontA;
+	uint16_t nFrontC;
+	uint16_t nFrontG;
+	uint16_t nFrontT;
+	uint16_t nFrontIndel;
+	uint16_t nReverseA;
+	uint16_t nReverseC;
+	uint16_t nReverseG;
+	uint16_t nReverseT;
+	uint16_t nReverseIndel;
 	QCINFO(){
-		nReverse = nDepthA = nDepthC = nDepthG = nDepthT = nDepthIndel = 0;
+		nFrontA = nFrontC = nFrontG = nFrontT = nFrontIndel = 0;
+		nReverseA = nReverseC = nReverseG = nReverseT = nReverseIndel = 0;
 	}
 };
 
@@ -61,11 +66,12 @@ struct VARIANT
 	
 	vector<string> vsRaw;
 
-
-
-	//TODO:information
-	QCINFO QcInfo;
-
+	//AS IS: BAM QC Information
+	vector<float> vfVaf;					// variant allele freq
+	vector<float> vfStrandBias;				// strand bias 
+	vector<vector<uint16_t> > v2nReadLen;	// [loci][read lenths]
+	vector<vector<uint8_t> > v2nMapQ;		// [loci][mapping qualities]
+	vector<vector<uint8_t> > v2nBaseQ;		// [loci][base qualities]
 };
 
 struct DIST_THREAD
@@ -107,8 +113,7 @@ private:
 	VARIANT m_Input;
 	
 	// calc info
-	bool GetStrandBias(QCINFO &);
-	bool GetVaf(QCINFO &);
+	bool GetAnalysis(QCINFO &,string);
 	bool GetNb(bam1_t *, int, QCINFO &);
 	void* AlleleDist(int);
 	static void *AlleleDist_helper(void *object)

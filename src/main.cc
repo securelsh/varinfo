@@ -85,8 +85,8 @@ int main(int argc, char* argv[])
 			if(bIsMod)		INFO.ModVariant();
 
 			//calculate read distribution
-			INFO.CalcInfo();		
-			
+			INFO.CalcInfo();
+
 			//report
 			//RD.Report();
 		}

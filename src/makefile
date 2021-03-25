@@ -1,11 +1,11 @@
 
 .SUFFIXS 	: .cc .o
 CC              = g++ 
-LIB             = -L../lib/ -lAlgLib -lbiofiles -lutil -pthread -L/usr/local/lib/ -lz 
+LIB             = -L../lib/ -lAlgLib -lbiofiles -lutil -pthread -lstatisticaltest -lbaminfo -L/usr/local/lib/ -lz 
 CFLAGS          = -O2 -g -Wall -std=c++0x 
 
-SRCS		= main.cc	preprocess.cc	util.cc	calcInfo.cc	#report.cc	
-OBJECTS     = main.o	preprocess.o	util.o	calcInfo.o	#report.o
+SRCS		= main.cc	preprocess.cc	util.cc	#calcInfo.cc	#report.cc	
+OBJECTS     = main.o	preprocess.o	util.o	#calcInfo.o	#report.o
 TARGET 		= varinfo 
 
 
