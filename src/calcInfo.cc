@@ -1,5 +1,6 @@
 #include "../header/varinfo.h"
-#include <math.h>
+#include "../header/statisticaltest.h"
+#include <cmath>
 
 
 pthread_mutex_t mutex_filter = PTHREAD_MUTEX_INITIALIZER;
@@ -7,10 +8,28 @@ pthread_mutex_t mutex_filter = PTHREAD_MUTEX_INITIALIZER;
 using namespace std;
 
 
-//get information
+/*
+
+- To Do:
+  -- test
+  
+- Changelog:
+  -- Date Mar-24-2021 SeokCholHong shulkhorn@gmail.com
+     --- fill variant info to VARIANT struct
+
+  -- Date Mar-22-2021 SeokCholHong shulkhorn@gmail.com
+     --- make method for estimation of strand bias & VAF
+
+  -- Date Mar-16-2021 SeokCholHong shulkhorn@gmail.com
+     --- Extract information from BAM file
+
+*/
+
+
 bool CINFO::CalcInfo()
 {
-	//parallel process
+	if(m_bIsDebug) cout << "- CINFO::CalcInfo()" << endl;
+	
 	vector<DIST_THREAD> vDistThread;
 	for(int i=0; i<m_nCntThread; i++)
 	{   
@@ -22,21 +41,28 @@ bool CINFO::CalcInfo()
 
 	this->SetStartTime();
 
-	//create thread
 	pthread_t* thread_handles;
 	thread_handles = new pthread_t[m_nCntThread];
 	for(int i=0; i<m_nCntThread; i++)	pthread_create(&thread_handles[i], NULL, AlleleDist_helper, (void*)&vDistThread[i]);
 	for(int i=0; i<m_nCntThread; i++)	pthread_join(thread_handles[i], NULL);
 	free(thread_handles);
 	cout << endl;
+
+	for(unsigned int i=0;i<m_Input.vsChr.size();i++){
+		cout << m_Input.vsChr[i] << " " << m_Input.vnPos[i] << m_Input.vsRef[i] << " " << m_Input.vsAlt[i] << " " << endl;
+		cout << m_Input.vfVaf[i] << " " << m_Input.vfStrandBias[i] << " " << endl;
+		for(unsigned int j=0;j<m_Input.v2nBaseQ[i].size();j++)
+			cout << (char)(m_Input.v2nBaseQ[i][j]+33);
+		cout << endl;
+		cout << endl;
+	}
+
 	return true;
 }
 
 
 void* CINFO::AlleleDist(int nId)
 {
-
-	//open bam
 	bamFile finBam;
 	finBam = bam_open(m_sBamFile.c_str(), "r");
 	if(finBam == NULL)	throw std::logic_error("ERROR: Can not open .bam file");
@@ -49,14 +75,16 @@ void* CINFO::AlleleDist(int nId)
 	bamIndex = bam_index_load(m_sBamFile.c_str());
 	if(!bamIndex)      throw std::logic_error("ERROR: Fail to read .bai file");
 
-	//calc info
 	int nSubCnt = (int)m_Input.vsChr.size()/m_nCntThread;
 	int nExtra = (int)m_Input.vsChr.size()%m_nCntThread;
 	if(nId < nExtra)	nSubCnt++;
 
-	//TODO: allocate a structure
 	
-
+	m_Input.vfVaf.reserve(m_Input.vsChr.size());
+	m_Input.vfStrandBias.reserve(m_Input.vsChr.size());
+	m_Input.v2nReadLen.reserve(m_Input.vsChr.size());
+	m_Input.v2nMapQ.reserve(m_Input.vsChr.size());
+	m_Input.v2nBaseQ.reserve(m_Input.vsChr.size());
 
 	for(int i=nId; i<(int)m_Input.vsChr.size(); i+=m_nCntThread)
 	{
@@ -74,8 +102,7 @@ void* CINFO::AlleleDist(int nId)
 			throw std::logic_error("Not available Chr");
 		}
 		
-		//Main function
-		this->GetVarInfo(i, sChr, nChr, nPos, sRef, sAlt);
+		this->GetVarInfo(i, sChr, nChr, nPos, sRef, sAlt, bamIndex, finBam);
 
 	}
 
@@ -85,482 +112,190 @@ void* CINFO::AlleleDist(int nId)
 
 }
 
-//TODO: fill variant info to VARIANT struct
-bool CINFO::GetVarInfo(int nIdx, string sChr, int nChr, int nPos, string sRef, string sAlt)
+bool CINFO::GetVarInfo(int nIdx, string sChr, int nChr, int nPos, string sRef, string sAlt, bam_index_t *bamIndex, bamFile finBam)
 {
-/*
-
-		int nPivotSPos = -1;
-		int nPivotSPosN = -1;
-		vector<int> vnNorSPos, vnNorEPos, vnVarSPos, vnVarEPos;
-		vector<int> vnNorSPosN, vnNorEPosN, vnVarSPosN, vnVarEPosN;
-		vector<string> vsNorSeq, vsVarSeq;
-		vector<string> vsNorSeqN, vsVarSeqN;
-		
-		
-		AlleleCount(bamIndex, finBam, nChr, nPos, sRef, sAlt, nRepeatCnt, nRepeatLastLen, nPivotSPos, vnNorSPos, vnNorEPos, vnVarSPos, vnVarEPos, vsNorSeq, vsVarSeq);
-		if(m_sBamFileN != "")	AlleleCount(bamIndexN, finBamN, nChr, nPos, sRef, sAlt, nRepeatCnt, nRepeatLastLen, nPivotSPosN, vnNorSPosN, vnNorEPosN, vnVarSPosN, vnVarEPosN, vsNorSeqN, vsVarSeqN);
-	
-
-		*/
-
-
-	return false;
-}
-
-
-
-/*
-
-bool CRD::FilterRead(string sChr, vector<int> &vnNorSPos, vector<int> &vnNorEPos, 
-		vector<int> &vnVarSPos, vector<int> &vnVarEPos,
-		vector<string> &vsNorSeq, vector<string> &vsVarSeq, int &nSumNor, int &nSumVar, int &nCntNor, int &nCntVar)
-{
-	vector<int> vnNorSPosT = vnNorSPos;
-	vector<int> vnNorEPosT = vnNorEPos;
-	vector<int> vnVarSPosT = vnVarSPos;
-	vector<int> vnVarEPosT = vnVarEPos;
-	vector<string> vsNorSeqT = vsNorSeq;
-	vector<string> vsVarSeqT = vsVarSeq;
-	vnNorSPos.clear();
-	vnNorEPos.clear();
-	vnVarSPos.clear();
-	vnVarEPos.clear();
-	vsNorSeq.clear();
-	vsVarSeq.clear();
-	
-	//calculate midium read length
-	vector<int> vnReadLen;
-	int nMidLen = 0;
-	for(int i=0; i<vnNorSPosT.size(); i++)		vnReadLen.push_back(vnNorEPosT[i]-vnNorSPosT[i]+1);
-	for(int i=0; i<vnVarSPosT.size(); i++)		vnReadLen.push_back(vnVarEPosT[i]-vnVarSPosT[i]+1);
-	sort(vnReadLen.begin(), vnReadLen.end());
-	if(vnReadLen.size() != 0)					nMidLen = vnReadLen[vnReadLen.size()/2];
-	
-	//calculate # of mutations
-	int nNorMidMutation = 0;
-	int nVarMidMutation = 0;
-	int nPivotSPos = -1;
-	int nPivotEPos = -1;
-	for(int i=0; i<vnNorSPosT.size(); i++)
-	{
-		if(nPivotSPos == -1 || vnNorSPos[i] < nPivotSPos)	nPivotSPos = vnNorSPos[i];
-		if(nPivotEPos == -1 || vnNorEPos[i] > nPivotEPos)	nPivotEPos = vnNorEPos[i];
-	}
-	for(int i=0; i<vnVarSPosT.size(); i++)
-	{
-		if(nPivotSPos == -1 || vnVarSPos[i] < nPivotSPos)	nPivotSPos = vnVarSPos[i];
-		if(nPivotEPos == -1 || vnVarEPos[i] > nPivotEPos)	nPivotEPos = vnVarEPos[i];
-	}
-
-	string sRefSeq;
-	if(!m_FaFile.GetSeq(sRefSeq, sChr, nPivotSPos, nPivotEPos))		return false;
-	
-	vector<int> vnNorMismatch;
-	vector<int> vnVarMismatch;
-	
-	for(int i=0; i<vnNorSPosT.size(); i++)
-	{
-		int nCntMismatch = 0;
-		for(int j=vnNorSPosT[i]; j<=vnNorEPosT[i]; j++)
-			if(vsNorSeqT[i][j-vnNorSPosT[i]] != sRefSeq[j-nPivotSPos])		nCntMismatch++;
-		vnNorMismatch.push_back(nCntMismatch);
-	}
-	for(int i=0; i<vnVarSPosT.size(); i++)
-	{
-		int nCntMismatch = 0;
-		for(int j=vnVarSPosT[i]; j<=vnVarEPosT[i]; j++)
-			if(vsVarSeqT[i][j-vnVarSPosT[i]] != sRefSeq[j-nPivotSPos])		nCntMismatch++;
-		vnVarMismatch.push_back(nCntMismatch);
-	}
-	int nMidMutation = 5;
-	sort(vnVarMismatch.begin(), vnVarMismatch.end());
-	sort(vnNorMismatch.begin(), vnNorMismatch.end());
-	if(vnNorMismatch.size() > vnVarMismatch.size())		nMidMutation = vnNorMismatch[vnNorMismatch.size()/2];
-	else												nMidMutation = vnVarMismatch[vnVarMismatch.size()/2];
-
-	
-	
-	// read filtering
-	int pnVarA[500] = {0,};
-	int pnVarC[500] = {0,}; 
-	int pnVarG[500] = {0,}; 
-	int pnVarT[500] = {0,}; 
-	int pnVarAll[500] = {0,};
-	int pnNorA[500] = {0,};
-	int pnNorC[500] = {0,}; 
-	int pnNorG[500] = {0,}; 
-	int pnNorT[500] = {0,}; 
-	int pnNorAll[500] = {0,};
-
-
-	for(int i=0; i<vnVarSPosT.size(); i++)
-	{
-		for(int j=vnVarSPosT[i]; j<=vnVarEPosT[i]; j++)
-		{
-			int nPos = j-nPivotSPos;
-			if(nPos > 500)	continue;
-			if(vsVarSeqT[i][j-vnVarSPosT[i]] == 'A')		pnVarA[nPos]++;
-			if(vsVarSeqT[i][j-vnVarSPosT[i]] == 'C')		pnVarC[nPos]++;
-			if(vsVarSeqT[i][j-vnVarSPosT[i]] == 'G')		pnVarG[nPos]++;
-			if(vsVarSeqT[i][j-vnVarSPosT[i]] == 'T')		pnVarT[nPos]++;
-			pnVarAll[nPos]++;
-		}
-	}
-	for(int i=0; i<vnNorSPosT.size(); i++)
-	{
-		for(int j=vnNorSPosT[i]; j<=vnNorEPosT[i]; j++)
-		{
-			int nPos = j-nPivotSPos;
-			if(nPos > 500)	continue;
-			if(vsNorSeqT[i][j-vnNorSPosT[i]] == 'A')		pnNorA[nPos]++;
-			if(vsNorSeqT[i][j-vnNorSPosT[i]] == 'C')		pnNorC[nPos]++;
-			if(vsNorSeqT[i][j-vnNorSPosT[i]] == 'G')		pnNorG[nPos]++;
-			if(vsNorSeqT[i][j-vnNorSPosT[i]] == 'T')		pnNorT[nPos]++;
-			pnNorAll[nPos]++;
-		}
-	}
-
-	for(int i=0; i<vnNorSPosT.size(); i++)
-	{
-		if(vnNorEPosT[i]-vnNorSPosT[i]+1 < nMidLen*0.8)		continue;
-		int nCntMismatch = 0;
-		for(int j=vnNorSPosT[i]; j<=vnNorEPosT[i]; j++)
-		{
-			if(j-vnNorSPosT[i] >= vsNorSeqT[i].size())	break;
-			if(vsNorSeqT[i][j-vnNorSPosT[i]] == 'D')	continue;
-			if(vsNorSeqT[i][j-vnNorSPosT[i]] != sRefSeq[j-nPivotSPos])		nCntMismatch++;
-		}
-		if(nCntMismatch > min(nMidMutation*2, 6))	continue;
-
-		vnNorSPos.push_back(vnNorSPosT[i]);
-		vnNorEPos.push_back(vnNorEPosT[i]);
-		vsNorSeq.push_back(vsNorSeqT[i]);
-	}
-	for(int i=0; i<vnVarSPosT.size(); i++)
-	{
-	//	cout << vnVarSPosT[i] << "-" << vnVarEPosT[i] << "\t" << vsVarSeqT[i].size() << endl;	
-		
-		if(vnVarEPosT[i]-vnVarSPosT[i]+1 < nMidLen*0.8)		continue;
-		int nCntMismatch = 0;
-		for(int j=vnVarSPosT[i]; j<=vnVarEPosT[i]; j++)
-		{
-			if(j-vnVarSPosT[i] >= vsVarSeqT[i].size())	break;
-			if(vsVarSeqT[i][j-vnVarSPosT[i]] == 'D')	continue;
-			
-			int nPos = j-nPivotSPos;
-			if(nPos > 500)		continue;
-			if(pnVarAll[nPos] < 4)								continue;
-			
-			double dVarVaf = 0;
-			double dNorVaf = 0;
-			if(pnVarAll[nPos] > 0)
-			{
-				if(vsVarSeqT[i][j-vnVarSPosT[i]] == 'A')		 dVarVaf = (double)pnVarA[nPos]/(double)pnVarAll[nPos];
-				if(vsVarSeqT[i][j-vnVarSPosT[i]] == 'C')		 dVarVaf = (double)pnVarC[nPos]/(double)pnVarAll[nPos];
-				if(vsVarSeqT[i][j-vnVarSPosT[i]] == 'G')		 dVarVaf = (double)pnVarG[nPos]/(double)pnVarAll[nPos];
-				if(vsVarSeqT[i][j-vnVarSPosT[i]] == 'T')		 dVarVaf = (double)pnVarT[nPos]/(double)pnVarAll[nPos];
-			}
-			if(pnNorAll[nPos] > 0)
-			{
-				if(vsVarSeqT[i][j-vnVarSPosT[i]] == 'A')		 dNorVaf = (double)pnNorA[nPos]/(double)pnNorAll[nPos];
-				if(vsVarSeqT[i][j-vnVarSPosT[i]] == 'C')		 dNorVaf = (double)pnNorC[nPos]/(double)pnNorAll[nPos];
-				if(vsVarSeqT[i][j-vnVarSPosT[i]] == 'G')		 dNorVaf = (double)pnNorG[nPos]/(double)pnNorAll[nPos];
-				if(vsVarSeqT[i][j-vnVarSPosT[i]] == 'T')		 dNorVaf = (double)pnNorT[nPos]/(double)pnNorAll[nPos];
-			}
-
-			if(dVarVaf >= 0.75 && dNorVaf <= 0.25)		continue;
-
-			if(vsVarSeq[i][j-vnVarSPosT[i]] != sRefSeq[nPos])		nCntMismatch++;
-		}
-		//cout << nCntMismatch << endl;
-		if(nCntMismatch > min(nMidMutation*2 + 1, 6))	continue;
-		
-		vnVarSPos.push_back(vnVarSPosT[i]);
-		vnVarEPos.push_back(vnVarEPosT[i]);
-		vsVarSeq.push_back(vsVarSeqT[i]);
-	}
-
-	// calculate read info.
-	nSumNor = 0;
-	nSumVar = 0;
-	for(int i=0; i<vnNorSPosT.size(); i++)		nSumNor += vnNorEPosT[i]-vnNorSPosT[i]+1;
-	for(int i=0; i<vnVarSPosT.size(); i++)		nSumVar += vnVarEPosT[i]-vnVarSPosT[i]+1;
-	nCntNor = vnNorSPosT.size();
-	nCntVar = vnVarSPosT.size();
-	return true;
-}
-*/
-/*
-bool CRD::AlleleCount(bam_index_t *bamIndex, bamFile &finBam, 
-		int nChr, int nPos, string sRef, string sAlt, int nRepeatCnt, int nRepeatLastLen, int &nPivotSPos, 
-		vector<int> &vnNorSPos, vector<int> &vnNorEPos, vector<int> &vnVarSPos, vector<int> &vnVarEPos, 
-		vector<string> &vsNorSeq, vector<string> &vsVarSeq)
-{
-
-	//CASE : seek start position of aligned reads in the bound
+	// read bam file
 	bam_iter_t bamIter;
 	bam1_t *b;
 	b = bam_init1();
-	bamIter = bam_iter_query(bamIndex, nChr, nPos-1, nPos);
+	bamIter = bam_iter_query(bamIndex, nChr, nPos-1, nPos);// nSPos<= locus <=nEPos
 
+	QCINFO QcInfo;
 	int nRet;
-
-	int nCntVar = 0;
-	int nCntNor = 0;
-	while((nRet = bam_iter_read(finBam, bamIter, b)) >= 0)
-	{
-		//calc all depth
-		int nSPos, nEPos;
-		string sSeq;
-		bool bIsVar = GetReadAlign(nSPos, nEPos, sSeq, nPos, sRef, sAlt, b);
-		
-		if(bIsVar)	nCntVar++;
-		else		nCntNor++;
-		
-
-		//modify Pos depending Indel
-		int nPosEdit = sRef.size()-sAlt.size();
-		if(bIsVar)		nEPos -= nPosEdit;
-
-		if(nSPos >= nPos-abs(nPosEdit))										continue;
-//		if(nEPos <= nPos+abs(nPosEdit))										continue;
-		if(nEPos <= nPos+abs(nPosEdit)*(nRepeatCnt)+nRepeatLastLen)			continue;
-
-
-		if(nPivotSPos == -1 || (nPivotSPos != -1 && nPivotSPos > nSPos))	nPivotSPos = nSPos;		
-
-		//calc variants depth
-		if(bIsVar)
-		{
-			vnVarSPos.push_back(nSPos);
-			vnVarEPos.push_back(nEPos);
-			vsVarSeq.push_back(sSeq);
-		}
-		else
-		{
-			vnNorSPos.push_back(nSPos);
-			vnNorEPos.push_back(nEPos);
-			vsNorSeq.push_back(sSeq);
-		}
+	while((nRet = bam_iter_read(finBam, bamIter, b)) >= 0){
+		GetNb(b, nPos - (b->core.pos+1), QcInfo);
 	}
+	GetAnalysis(QcInfo, sRef);
+
+	m_Input.vfVaf.push_back(QcInfo.fVaf);
+	m_Input.vfStrandBias.push_back(QcInfo.fStrandBias);
+	m_Input.v2nReadLen.push_back(QcInfo.vnReadLen);
+	m_Input.v2nMapQ.push_back(QcInfo.vnMapQ);
+	m_Input.v2nBaseQ.push_back(QcInfo.vnBaseQ);
 
 	bam_iter_destroy(bamIter);
 	bam_destroy1(b);
 
-
-	return true;
+	return false;
 }
 
-
-bool CRD::CalcPearsonCorr(int *pnAllDp, int *pnVarDp, double &dCorr, double &dPval)
+bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 {
-	int nEPosT = 1000;
-	for(int i=1000; i>=0; i--)
-	{
-		if(pnAllDp[i] != 0)	
-		{
-			nEPosT = i;
-			break;
+	//cigar
+	uint32_t nTemp=0;
+	int l,nPl,nPreAlgn;
+	for(l=b->core.l_qname, nPl=1, nPreAlgn = 0;
+		l<(b->core.l_qname + (b->core.n_cigar*4));
+		l++, nPl++){
+		int nChk = nPl%4;
+		if(nChk==0){
+			nTemp = (b->data[l]<<24) | nTemp;
+
+			int nAlgn = (nTemp>>4);
+			int op = nTemp&0xf;
+			if(op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF){
+				nPreAlgn += nAlgn;
+				if(nPos<nPreAlgn)	break;
+			}
+			else if(op == BAM_CINS){
+				if(nPos<nPreAlgn)	break;
+				nPos += nAlgn;
+				nPreAlgn += nAlgn;
+			}
+			else if(op == BAM_CDEL){
+				if(nPreAlgn<=nPos && nPos<nPreAlgn+nAlgn){
+					return true;
+				}
+				else if(nPos>=nPreAlgn+nAlgn){
+					nPos -= nAlgn;
+				}
+				else if(nPos<nPreAlgn)	break;
+			}
+			else if(op == BAM_CSOFT_CLIP || op == BAM_CPAD){
+				if(nPos<nPreAlgn)	break;
+				nPos += nAlgn;
+				nPreAlgn += nAlgn;
+			}
+			else if(op == BAM_CREF_SKIP){
+				if(nPos<nPreAlgn)	break;
+				nPos += nAlgn;
+				nPreAlgn += nAlgn;
+			}
+			else if(op == BAM_CHARD_CLIP){
+			}
 		}
-//		cout << pnAllDp[i] << "\t";
+		else if(nChk==1)	nTemp = b->data[l];
+		else if(nChk==2)	nTemp = (b->data[l]<<8) | nTemp;
+		else if(nChk==3)	nTemp = (b->data[l]<<16) | nTemp;
 	}
-//	cout << endl;
-//	for(int j=0; j<nEPosT; j++)		cout << pnVarDp[j] << "\t";
-//	cout << endl;
+	if(nPos>=b->core.l_qseq)	return 0;
 
-
-	double *pdX = new double[nEPosT];
-	double *pdY = new double[nEPosT];
-	for(int i=0; i<nEPosT; i++)
-	{
-		pdX[i] = (double)pnAllDp[i];
-		pdY[i] = (double)pnVarDp[i];
+	// check indel
+	bool bIsIndel=false;
+	while(l<(b->core.l_qname + (b->core.n_cigar*4))){
+		l++, nPl++;
+		int nChk = nPl%4;
+		if(nChk==0){
+			nTemp = (b->data[l]<<24) | nTemp;
+			int op = nTemp&0xf;
+			if(op == BAM_CINS || op == BAM_CDEL){
+				bIsIndel=true;
+			}
+		}
+		else if(nChk==1)	nTemp = b->data[l];
+		else if(nChk==2)	nTemp = (b->data[l]<<8) | nTemp;
+		else if(nChk==3)	nTemp = (b->data[l]<<16) | nTemp;
 	}
 
-
-	alglib::real_1d_array x;
-	x.setcontent(nEPosT, pdX);
-	alglib::real_1d_array y;
-	y.setcontent(nEPosT, pdY);
-	
-	delete [] pdX;
-	delete [] pdY;
-
-	double dPearsonCorr = alglib::pearsoncorr2(x,y);
-	alglib::ae_int_t nSize = nEPosT;
-	double a, b, c;
-	alglib::pearsoncorrelationsignificance(dPearsonCorr, nSize, a,b,c);
-	
-
-	dCorr = dPearsonCorr*dPearsonCorr;
-	if(dPearsonCorr < 0)	dCorr = 0;
-	if(dCorr < 0)	dCorr = 0;
-	if(dCorr > 1)	dCorr = 1;
-	dPval = a;
-	return true;
-}
-
-
-
-bool CRD::GetReadAlign(int &nSPos, int &nEPos, string &sSeq, int nPos, string sRef, string sAlt, bam1_t *b)
-{
-	bool bIsVar = false;
-	int nCigar[1000];
-	char cSeq[1000];
-	
-	memcpy(nCigar, b->data+b->core.l_qname, b->core.n_cigar*4);
-	memcpy(cSeq, b->data + b->core.l_qname + b->core.n_cigar*4, (b->core.l_qseq+1)/2);
-
-
-
-	//resolve cigar
-	int nRefPos = b->core.pos;
-	int nSeqPos = 0;
-
-	if(b->core.n_cigar == 1) 	// just one operation, save a loop
+	if(bam1_strand(b))
 	{
-		int op = nCigar[0] & 0x0000000f;
-		int l = nCigar[0] >> 4;
-		nSPos = nRefPos + 1;
-		nEPos = nRefPos + l;
-		
-		if(op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF)
-		{
-			int nVarPosInSeq = nPos - (nRefPos+1);
-			unsigned char base = bam1_seqi(cSeq, nVarPosInSeq); // base
-			if(sRef.size() == 1 && sAlt.size() == 1)
-			{			
-				if((base == 1 && sAlt == "A") || (base == 2 && sAlt == "C"))	bIsVar = true;
-				if((base == 4 && sAlt == "G") || (base == 8 && sAlt == "T"))	bIsVar = true;
-			}
-			
-			//make tail seq
-			for(int i=0; i<l; i++)		
-			{	
-				base = bam1_seqi(cSeq, i); // base
-
-				if(base == 1)		sSeq.push_back('A');
-				if(base == 2)		sSeq.push_back('C');
-				if(base == 4)		sSeq.push_back('G');
-				if(base == 8)		sSeq.push_back('T');
-				if(base == 15)		sSeq.push_back('N');
-			}
+		if(bIsIndel) {
+			BamInfo.nReverseIndel++;
+		} else {
+			unsigned char ucBase = bam1_seqi(bam1_seq(b), nPos);
+			if     (ucBase == 0x01)	BamInfo.nReverseA++;
+			else if(ucBase == 0x02)	BamInfo.nReverseC++;
+			else if(ucBase == 0x04)	BamInfo.nReverseG++;
+			else if(ucBase == 0x08)	BamInfo.nReverseT++;
+			else if(ucBase == 0x0F)	return 0;
+			else
+				throw std::logic_error("ERROR: sequence error. It deosn't belong to ACGTN (in function CCOMPDP::GetNb():64)");
 		}
 	}
 	else
 	{
-		nSPos = nRefPos+1;
-		nEPos = nRefPos;	
-
-		for(int i=0; i<b->core.n_cigar; i++)
-		{ 
-			int op = nCigar[i] & 0x0000000f;
-			int l = nCigar[i] >> 4;
-		
-			if(op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF)
-			{
-				unsigned char base;
-				int nVarPosInSeq = nSeqPos + (nPos - (nRefPos+1));
-				
-				if(nRefPos+1 <= nPos && nPos <= nRefPos+l)
-				{
-					base = bam1_seqi(cSeq, nVarPosInSeq); // base
-
-					if(sRef.size() == 1 && sAlt.size() == 1)
-					{
-						if((base == 1 && sAlt == "A") || (base == 2 && sAlt == "C"))	bIsVar = true;
-						if((base == 4 && sAlt == "G") || (base == 8 && sAlt == "T"))	bIsVar = true;
-					}
-				}
-				
-				//make tail seq
-				for(int j=0; j<l; j++)		
-				{	
-					base = bam1_seqi(cSeq, nSeqPos+j);
-					if(base == 1)		sSeq.push_back('A');
-					if(base == 2)		sSeq.push_back('C');
-					if(base == 4)		sSeq.push_back('G');
-					if(base == 8)		sSeq.push_back('T');
-					if(base == 15)		sSeq.push_back('N');
-				}
-				
-				nRefPos += l;
-				nSeqPos += l;
-				nEPos += l;
-			}
-			else if(op == BAM_CDEL)
-			{
-				int nVarPosInSeq = nSeqPos + (nPos - (nRefPos+1));
-				
-				if(nRefPos+1 == nPos+1 && l == sRef.size()-sAlt.size())
-				{
-					unsigned char base = bam1_seqi(cSeq, nSeqPos-1); // base
-					if((base == 1 && sAlt == "A") || (base == 2 && sAlt == "C"))	bIsVar = true;
-					if((base == 4 && sAlt == "G") || (base == 8 && sAlt == "T"))	bIsVar = true;
-				}
-				
-				for(int j=0; j<l; j++)		sSeq.push_back('D');
-				
-				nRefPos += l;
-				nEPos += l;
-			}
-			else if(op == BAM_CREF_SKIP)
-			{
-			//	cout << "R" << l << endl;
-				fprintf( stderr, "N" );
-				fprintf( stderr, "(%d,%d): ", nRefPos, nSeqPos);
-				nRefPos += l;
-				nSeqPos += l;
-				nEPos += l;
-			}
-			else if(op == BAM_CINS)
-			{
-			//	cout << "I" << l << endl;
-				if(nRefPos+1 == nPos+1 && l == sAlt.size()-sRef.size())
-				{
-					//make insertion seq
-					string sSeqTemp = "";
-					for(int m=0; m<l; m++)
-					{
-						unsigned char base = bam1_seqi(cSeq, nSeqPos+m); //base
-						switch(base)
-						{
-							case 1: sSeqTemp.push_back('A');    break;
-							case 2: sSeqTemp.push_back('C');    break;
-							case 4: sSeqTemp.push_back('G');    break;
-							case 8: sSeqTemp.push_back('T');    break;
-							case 15:sSeqTemp.push_back('N');    break;
-							default:                break;
-						}
-					}
-
-					if(sSeqTemp == sAlt.substr(1))
-					{
-						unsigned char base = bam1_seqi(cSeq, nSeqPos-1); // base
-						if((base == 1 && sRef == "A") || (base == 2 && sRef == "C"))	bIsVar = true;
-						if((base == 4 && sRef == "G") || (base == 8 && sRef == "T"))	bIsVar = true;
-		
-				//		cout << nPos << "\t" << nRefPos << "\t" << nSeqPos << "\t" << bIsVar << endl;
-					}
-				}
-				nSeqPos += l;
-			}
-			else if(op == BAM_CSOFT_CLIP)
-			{
-				//cout << "S" << l << endl;
-				nSeqPos += l;	
-			}
-			else if(op == BAM_CHARD_CLIP){}
+		if(bIsIndel) {
+			BamInfo.nFrontIndel++;
+		} else {
+			unsigned char ucBase = bam1_seqi(bam1_seq(b), nPos);
+			if     (ucBase == 0x01)	BamInfo.nFrontA++;
+			else if(ucBase == 0x02)	BamInfo.nFrontC++;
+			else if(ucBase == 0x04)	BamInfo.nFrontG++;
+			else if(ucBase == 0x08)	BamInfo.nFrontT++;
+			else if(ucBase == 0x0F)	return 0;
+			else
+				throw std::logic_error("ERROR: sequence error. It deosn't belong to ACGTN (in function CCOMPDP::GetNb():64)");
 		}
 	}
-	return bIsVar;
+	
+	BamInfo.vnReadLen.push_back(b->core.l_qseq);
+	
+	char *nBaseQual = (char*)calloc(b->core.l_qseq, 1);
+	memcpy(nBaseQual, bam1_qual(b), b->core.l_qseq);
+	BamInfo.vnBaseQ.push_back(nBaseQual[nPos]);
+	
+	BamInfo.vnMapQ.push_back(b->core.qual);
+
+	return 1;
 }
 
+bool CINFO::GetAnalysis(QCINFO &QcInfo, string sRef){
+	float fStrandBias;
+	int nFR = 0;
+	int nFA = 0;
+	int nRR = 0;
+	int nRA = 0;
 
+	uint16_t nFrontA       = QcInfo.nFrontA      ;
+	uint16_t nFrontC       = QcInfo.nFrontC      ;
+	uint16_t nFrontG       = QcInfo.nFrontG      ;
+	uint16_t nFrontT       = QcInfo.nFrontT      ;
+	uint16_t nFrontIndel   = QcInfo.nFrontIndel  ;
+	uint16_t nReverseA     = QcInfo.nReverseA    ;
+	uint16_t nReverseC     = QcInfo.nReverseC    ;
+	uint16_t nReverseG     = QcInfo.nReverseG    ;
+	uint16_t nReverseT     = QcInfo.nReverseT    ;
+	uint16_t nReverseIndel = QcInfo.nReverseIndel;
 
+	if(sRef=="A"){
+		nFR = nFrontA;
+		nFA = nFrontC+nFrontG+nFrontT+nFrontIndel;
+		nRR = nReverseA;
+		nRA = nReverseC+nReverseG+nReverseT+nReverseIndel;
+	}
+	else if(sRef=="C"){
+		nFR = nFrontC;
+		nFA = nFrontA+nFrontG+nFrontT+nFrontIndel;
+		nRR = nReverseC;
+		nRA = nReverseA+nReverseG+nReverseT+nReverseIndel;
+	}
+	else if(sRef=="G"){
+		nFR = nFrontG;
+		nFA = nFrontC+nFrontA+nFrontT+nFrontIndel;
+		nRR = nReverseG;
+		nRA = nReverseC+nReverseA+nReverseT+nReverseIndel;
+	}
+	else if(sRef=="T"){
+		nFR = nFrontT;
+		nFA = nFrontC+nFrontG+nFrontA+nFrontIndel;
+		nRR = nReverseT;
+		nRA = nReverseC+nReverseG+nReverseA+nReverseIndel;
+	}
+	QcInfo.fStrandBias = STATTEST::GetFisherPvalue(nFR,nRR,nFA,nRA);
+	QcInfo.fVaf = (float)(nFA+nRA)/(nFR+nRR+nFA+nRA);
 
-*/
+	return true;
+}
 
 int CINFO::ConvertChrToTid(string sChr, bam_header_t* bamHeader)
 {

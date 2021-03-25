@@ -30,6 +30,29 @@ using namespace std;
 
 class CINFO;
 
+struct QCINFO
+{
+	float fVaf;
+	float fStrandBias;
+	vector<uint16_t> vnReadLen;
+	vector<uint8_t> vnMapQ;
+	vector<uint8_t> vnBaseQ;
+	uint16_t nFrontA;
+	uint16_t nFrontC;
+	uint16_t nFrontG;
+	uint16_t nFrontT;
+	uint16_t nFrontIndel;
+	uint16_t nReverseA;
+	uint16_t nReverseC;
+	uint16_t nReverseG;
+	uint16_t nReverseT;
+	uint16_t nReverseIndel;
+	QCINFO(){
+		nFrontA = nFrontC = nFrontG = nFrontT = nFrontIndel = 0;
+		nReverseA = nReverseC = nReverseG = nReverseT = nReverseIndel = 0;
+	}
+};
+
 struct VARIANT
 {
 	//raw data
@@ -43,9 +66,12 @@ struct VARIANT
 	
 	vector<string> vsRaw;
 
-	//TODO:information
-	
-
+	//AS IS: BAM QC Information
+	vector<float> vfVaf;					// variant allele freq
+	vector<float> vfStrandBias;				// strand bias 
+	vector<vector<uint16_t> > v2nReadLen;	// [loci][read lenths]
+	vector<vector<uint8_t> > v2nMapQ;		// [loci][mapping qualities]
+	vector<vector<uint8_t> > v2nBaseQ;		// [loci][base qualities]
 };
 
 struct DIST_THREAD
@@ -87,13 +113,15 @@ private:
 	VARIANT m_Input;
 	
 	// calc info
+	bool GetAnalysis(QCINFO &,string);
+	bool GetNb(bam1_t *, int, QCINFO &);
 	void* AlleleDist(int);
 	static void *AlleleDist_helper(void *object)
 	{
 		DIST_THREAD *my = (DIST_THREAD*)object;
 		my->INFO->AlleleDist(my->nId);
 	}
-	bool GetVarInfo(int, string, int, int, string, string);
+	bool GetVarInfo(int, string, int, int, string, string, bam_index_t *, bamFile);
 	int ConvertChrToTid(string, bam_header_t*);
 /*
 	bool GetReadAlign(int &, int &, string &, int, string, string, bam1_t*);
@@ -114,7 +142,7 @@ private:
 
 	//util
 	void SetStartTime()
-	{		
+	{
 		//m_clockStart = clock();
 		clock_gettime(CLOCK_REALTIME, &m_tspecStart);
 	};
