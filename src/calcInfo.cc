@@ -48,14 +48,14 @@ bool CINFO::CalcInfo()
 	free(thread_handles);
 	cout << endl;
 
-	for(unsigned int i=0;i<m_Input.vsChr.size();i++){
-		cout << m_Input.vsChr[i] << " " << m_Input.vnPos[i] << m_Input.vsRef[i] << " " << m_Input.vsAlt[i] << " " << endl;
-		cout << m_Input.vfVaf[i] << " " << m_Input.vfStrandBias[i] << " " << endl;
-		for(unsigned int j=0;j<m_Input.v2nBaseQ[i].size();j++)
-			cout << (char)(m_Input.v2nBaseQ[i][j]+33);
-		cout << endl;
-		cout << endl;
-	}
+	// for(unsigned int i=0;i<m_Input.vsChr.size();i++){
+	// 	cout << m_Input.vsChr[i] << " " << m_Input.vnPos[i] << m_Input.vsRef[i] << " " << m_Input.vsAlt[i] << " " << endl;
+	// 	cout << m_Input.vfVaf[i] << " " << m_Input.vfStrandBias[i] << " " << endl;
+	// 	for(unsigned int j=0;j<m_Input.v2nBaseQ[i].size();j++)
+	// 		cout << (char)(m_Input.v2nBaseQ[i][j]+33);
+	// 	cout << endl;
+	// 	cout << endl;
+	// }
 
 	return true;
 }
