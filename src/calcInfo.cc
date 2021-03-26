@@ -29,6 +29,12 @@ using namespace std;
 bool CINFO::CalcInfo()
 {
 	if(m_bIsDebug) cout << "- CINFO::CalcInfo()" << endl;
+
+	m_Input.vfVaf.resize(m_Input.vsChr.size());
+	m_Input.vfStrandBias.resize(m_Input.vsChr.size());
+	m_Input.v2nReadLen.resize(m_Input.vsChr.size());
+	m_Input.v2nMapQ.resize(m_Input.vsChr.size());
+	m_Input.v2nBaseQ.resize(m_Input.vsChr.size());
 	
 	vector<DIST_THREAD> vDistThread;
 	for(int i=0; i<m_nCntThread; i++)
@@ -47,15 +53,6 @@ bool CINFO::CalcInfo()
 	for(int i=0; i<m_nCntThread; i++)	pthread_join(thread_handles[i], NULL);
 	free(thread_handles);
 	cout << endl;
-
-	// for(unsigned int i=0;i<m_Input.vsChr.size();i++){
-	// 	cout << m_Input.vsChr[i] << " " << m_Input.vnPos[i] << m_Input.vsRef[i] << " " << m_Input.vsAlt[i] << " " << endl;
-	// 	cout << m_Input.vfVaf[i] << " " << m_Input.vfStrandBias[i] << " " << endl;
-	// 	for(unsigned int j=0;j<m_Input.v2nBaseQ[i].size();j++)
-	// 		cout << (char)(m_Input.v2nBaseQ[i][j]+33);
-	// 	cout << endl;
-	// 	cout << endl;
-	// }
 
 	return true;
 }
@@ -78,13 +75,6 @@ void* CINFO::AlleleDist(int nId)
 	int nSubCnt = (int)m_Input.vsChr.size()/m_nCntThread;
 	int nExtra = (int)m_Input.vsChr.size()%m_nCntThread;
 	if(nId < nExtra)	nSubCnt++;
-
-	
-	m_Input.vfVaf.reserve(m_Input.vsChr.size());
-	m_Input.vfStrandBias.reserve(m_Input.vsChr.size());
-	m_Input.v2nReadLen.reserve(m_Input.vsChr.size());
-	m_Input.v2nMapQ.reserve(m_Input.vsChr.size());
-	m_Input.v2nBaseQ.reserve(m_Input.vsChr.size());
 
 	for(int i=nId; i<(int)m_Input.vsChr.size(); i+=m_nCntThread)
 	{
@@ -127,11 +117,20 @@ bool CINFO::GetVarInfo(int nIdx, string sChr, int nChr, int nPos, string sRef, s
 	}
 	GetAnalysis(QcInfo, sRef);
 
-	m_Input.vfVaf.push_back(QcInfo.fVaf);
-	m_Input.vfStrandBias.push_back(QcInfo.fStrandBias);
-	m_Input.v2nReadLen.push_back(QcInfo.vnReadLen);
-	m_Input.v2nMapQ.push_back(QcInfo.vnMapQ);
-	m_Input.v2nBaseQ.push_back(QcInfo.vnBaseQ);
+	m_Input.vfVaf[nIdx] = QcInfo.fVaf;
+	m_Input.vfStrandBias[nIdx] = QcInfo.fStrandBias;
+	m_Input.v2nReadLen[nIdx] = QcInfo.vnReadLen;
+	m_Input.v2nMapQ[nIdx] = QcInfo.vnMapQ;
+	m_Input.v2nBaseQ[nIdx] = QcInfo.vnBaseQ;
+
+	if(QcInfo.vnMapQ.size()<1||QcInfo.vnBaseQ.size()<1){
+		cout << sChr << " " << nPos << endl;
+		exit(1);
+	}
+	if(m_Input.v2nMapQ[nIdx].size()<1||m_Input.v2nBaseQ[nIdx].size()<1){
+		cout << sChr << " " << nPos << endl;
+		exit(1);
+	}
 
 	bam_iter_destroy(bamIter);
 	bam_destroy1(b);
