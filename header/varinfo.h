@@ -104,7 +104,7 @@ public:
 	bool ReadInput();
 	bool ModVariant();
 	bool CalcInfo();
-	//bool Report();
+	bool Report();
 	
 	int PrintCommonInfo();
 
@@ -129,13 +129,13 @@ private:
 	bool AlleleCount(bam_index_t *, bamFile &, int, int, string, string, int, int, int &, vector<int> &, vector<int> &, vector<int> &, vector<int> &, vector<string> &, vector<string> &);
 	//double CalcCoef(string sChr, vector<string> &, vector<int> &, vector<int> &);
 	bool FilterRead(string, vector<int> &, vector<int> &, vector<int> &, vector<int> &, vector<string> &, vector<string> &, int &, int &, int &, int &);
-
+*/
 	// report 
-	bool ReportVcf();
+	bool ReportBamInfo();
 //	bool ReportAdiscan();
 //	bool ReportVarscan();
 
-*/
+
 	// library
 	bool Parsing(vector<string> &, string, string);
 	bool CalcPearsonCorr(int*, int*, double&, double&);

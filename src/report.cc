@@ -1,55 +1,74 @@
-#include "../header/rdscan.h"
+#include "../header/varinfo.h"
 
 
 using namespace std;
 
 
-bool CRD::Report()
+bool CINFO::Report()
 {
-	if(m_nStatus == 1)      ReportVcf();
+	ReportBamInfo();
 
 	return true;
 }
 
-bool CRD::ReportVcf()
+bool CINFO::ReportBamInfo()
 {
-	this->SetStartTime();
-	this->ViewStatus(0, m_vcf.vsChr.size(),"Generate a vcf file with RDscore");
-	
 	ofstream fout;
-	fout.open(m_sOutputFile.c_str());
-	//header
-	string sPrevStatus = "";
-	for(int i=0; i<m_vcf.vsHeader.size(); i++)
-	{
-		string sCurrStatus = m_vcf.vsHeader[i].substr(0,6);
-		if(sPrevStatus == "##INFO" && sCurrStatus != sPrevStatus)
-		{
-			fout << "##INFO=<ID=RDscore,Type=Float,Number=1,Description=\"Read Distribution (RD) score of a variant\">" << endl;
-		}
-		fout << m_vcf.vsHeader[i] << endl;
-		sPrevStatus = sCurrStatus;
-	}
-	fout << m_vcf.sFormat << endl;
+	fout.open((m_sOutputFile+".baminfo").c_str());
 	
-	//variants
-	for(int i=0; i<m_vcf.vsChr.size(); i++)
+	fout << "{" << endl;
+	fout << "\t\"sampleName\" : \"" << m_sBamFile.substr(m_sBamFile.find_last_of('/')+1) << "\","<< endl;
+	fout << "\t\"bamInfo\" : [" << endl;
+
+	for(unsigned int i=0; i<m_Input.vsChr.size()-1; i++)
 	{
-		double dRDscore = m_rdscan.vdCorr[i];
-//		if(dRDscore > 0.8)		dRDscore = 0.8;
-		fout << m_vcf.vsChr[i] << "\t" << m_vcf.vnPos[i] << "\t" << m_vcf.vsId[i] << "\t";
-		fout << m_vcf.vsRef[i] << "\t" << m_vcf.vsAlt[i] << "\t" << m_vcf.vsQual[i] << "\t";
-		fout << m_vcf.vsFilter[i] << "\t" << m_vcf.vsInfo[i] << ";RDscore=" << dRDscore << "\t"; 
-		
-		fout << m_vcf.vsEtc[i];
-		fout << endl;
-
-		if(i+1 == m_vcf.vsChr.size() || i%(m_vcf.vsChr.size()/100)==0)
-			this->ViewStatus(i+1, m_vcf.vsChr.size(),"Generate a vcf file with RDscore");
-
+		fout << "\t\t{" << endl;
+		fout << "\t\t\t\"chr\" : \"" 		<< m_Input.vsChr[i] << "\"" << endl;
+		fout << "\t\t\t\"pos\" : " 			<< m_Input.vnPos[i] << endl;
+		fout << "\t\t\t\"ref\" : \"" 		<< m_Input.vsRef[i] << "\"" << endl;
+		fout << "\t\t\t\"alt\" : \"" 		<< m_Input.vsAlt[i] << "\"" << endl;
+		fout << "\t\t\t\"vaf\" : "	 		<< m_Input.vfVaf[i] << endl;
+		fout << "\t\t\t\"strandBias\" : "	<< m_Input.vfStrandBias[i] << endl;
+		fout << "\t\t\t\"readLen\" : [";
+		for(unsigned int j=0; j<m_Input.v2nReadLen[i].size()-1; j++)
+			fout << m_Input.v2nReadLen[i][j] << ",";
+		fout << m_Input.v2nReadLen[i][m_Input.v2nReadLen[i].size()-1] << "]" << endl;
+		fout << "\t\t\t\"mapQ\" : [";
+		for(unsigned int j=0; j<m_Input.v2nMapQ[i].size()-1; j++)
+			fout << (int)m_Input.v2nMapQ[i][j] << ",";
+		fout << (int)m_Input.v2nMapQ[i][m_Input.v2nMapQ[i].size()-1] << "]" << endl;
+		fout << "\t\t\t\"baseQ\" : [";
+		for(unsigned int j=0; j<m_Input.v2nBaseQ[i].size()-1; j++)
+			fout << (int)m_Input.v2nBaseQ[i][j] << ",";
+		fout << (int)m_Input.v2nBaseQ[i][m_Input.v2nBaseQ[i].size()-1] << "]" << endl;
+		fout << "\t\t}," << endl;
 	}
+	int nLast = m_Input.vsChr.size()-1;
+	fout << "\t\t{" << endl;
+	fout << "\t\t\t\"chr\" : \"" 		<< m_Input.vsChr[nLast] << "\"" << endl;
+	fout << "\t\t\t\"pos\" : " 			<< m_Input.vnPos[nLast] << endl;
+	fout << "\t\t\t\"ref\" : \"" 		<< m_Input.vsRef[nLast] << "\"" << endl;
+	fout << "\t\t\t\"alt\" : \"" 		<< m_Input.vsAlt[nLast] << "\"" << endl;
+	fout << "\t\t\t\"vaf\" : "	 		<< m_Input.vfVaf[nLast] << endl;
+	fout << "\t\t\t\"strandBias\" : "	<< m_Input.vfStrandBias[nLast] << endl;
+	fout << "\t\t\t\"readLen\" : [";
+	for(unsigned int j=0; j<m_Input.v2nReadLen[nLast].size()-1; j++)
+		fout << m_Input.v2nReadLen[nLast][j] << ",";
+	fout << m_Input.v2nReadLen[nLast][m_Input.v2nReadLen[nLast].size()-1] << "]" << endl;
+	fout << "\t\t\t\"mapQ\" : [";
+	for(unsigned int j=0; j<m_Input.v2nMapQ[nLast].size()-1; j++)
+		fout << (int)m_Input.v2nMapQ[nLast][j] << ",";
+	fout << (int)m_Input.v2nMapQ[nLast][m_Input.v2nMapQ[nLast].size()-1] << "]" << endl;
+	fout << "\t\t\t\"baseQ\" : [";
+	for(unsigned int j=0; j<m_Input.v2nBaseQ[nLast].size()-1; j++)
+		fout << (int)m_Input.v2nBaseQ[nLast][j] << ",";
+	fout << (int)m_Input.v2nBaseQ[nLast][m_Input.v2nBaseQ[nLast].size()-1] << "]" << endl;
+	fout << "\t\t}," << endl;
+
+	fout << "\t]" << endl;
+	fout << "}" << endl;
+
 	fout.close();
-	cout << endl << endl;
 
 	return true;
 }
