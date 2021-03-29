@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
 			INFO.CalcInfo();
 
 			//report
-			//RD.Report();
+			INFO.Report();
 		}
 	}
 	catch (std::logic_error const& s)
