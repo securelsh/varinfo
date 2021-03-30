@@ -55,6 +55,8 @@ struct QCINFO
 
 struct VARIANT
 {
+	vector<bool> vbIsPass;
+
 	//raw data
 	vector<string> vsHeader;
 	
@@ -91,8 +93,8 @@ public:
 	string m_sInputFile;
 	string m_sOutputFile;
 	int m_nCntThread;
+	double m_dVaf;
 
-	//RDscan m_rdscan;			//rdscan (output)
 
 	//for util
 	clock_t m_clockStart;
@@ -100,7 +102,7 @@ public:
 	struct timespec m_tspecStart;
 	struct timespec m_tspecEnd;
 public:
-	CINFO(string, string, string, bool, int, bool);
+	CINFO(string, string, string, bool, int, double, bool);
 	bool ReadInput();
 	bool ModVariant();
 	bool CalcInfo();
@@ -113,6 +115,9 @@ private:
 	VARIANT m_Input;
 	
 	// calc info
+	bool DelIns(int, int);
+	bool GetRead(bam1_t*, int, int);
+
 	bool GetAnalysis(QCINFO &,string);
 	bool GetNb(bam1_t *, int, QCINFO &);
 	void* AlleleDist(int);

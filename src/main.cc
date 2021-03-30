@@ -37,7 +37,7 @@
 using namespace std;
 
 int parse_opt(const int argc, char **argv, int &nStatus, string &sBamFile, 
-	string &sInputFile, string &sOutputFile, bool &bIsMod, int &nCntThread, bool &bIsDebug);
+	string &sInputFile, string &sOutputFile, bool &bIsMod, int &nCntThread, double &dVaf, bool &bIsDebug);
 bool manual()
 {
 	cout << "====================================== RDscan manual ====================================" << endl;
@@ -48,7 +48,8 @@ bool manual()
 	cout << endl;
 	cout << "2. OPTIONs" << endl;
 	cout << "  (1) # of Thread                     -t    [unsigned int], default=1"				<< endl;
-	cout << "  (2) consecurive SNPs to Indel       -m"	<< endl;
+	cout << "  (2) consecutive SNPs to Indel       -m"	<< endl;
+	cout << "  (3) VAF cutoff                      -v    [unsigned int], default=0.05"			<< endl;
 	cout << "==========================================================================================" << endl << endl;
 
 	return true;
@@ -61,6 +62,7 @@ int main(int argc, char* argv[])
 	string sBamFile = "";			//bam file
 	string sInputFile;
 	string sOutputFile;
+	double dVaf = 0.05;
 	int nCntThread = 1;
 	bool bIsDebug = false;
 	bool bIsMod = false;
@@ -68,12 +70,12 @@ int main(int argc, char* argv[])
 
 	try
 	{
-		parse_opt(argc, argv, nStatus, sBamFile, sInputFile, sOutputFile, bIsMod, nCntThread, bIsDebug); 
+		parse_opt(argc, argv, nStatus, sBamFile, sInputFile, sOutputFile, bIsMod, nCntThread, dVaf, bIsDebug); 
 		if(nStatus == 0)			manual();
 		else
 		{
 			//construct class & init
-			CINFO INFO(sBamFile, sInputFile, sOutputFile, bIsMod, nCntThread, bIsDebug);
+			CINFO INFO(sBamFile, sInputFile, sOutputFile, bIsMod, nCntThread, dVaf, bIsDebug);
 
 		
 			INFO.PrintCommonInfo();
@@ -113,7 +115,7 @@ int main(int argc, char* argv[])
 
 
 int parse_opt(const int argc, char **argv, int &nStatus, string &sBamFile, 
-string &sInputFile, string &sOutputFile, bool &bIsMod, int &nCntThread, bool &bIsDebug)
+string &sInputFile, string &sOutputFile, bool &bIsMod, int &nCntThread, double &dVaf, bool &bIsDebug)
 {
 	bool bBOption = false;
 	bool bIOption = false;
@@ -126,6 +128,7 @@ string &sInputFile, string &sOutputFile, bool &bIsMod, int &nCntThread, bool &bI
 		{"output",			1, 0, 'o'},
 		{"modigy",			1, 0, 'm'},		//4	
 		{"num_thread", 		1, 0, 't'},		//8
+		{"vaf",				1, 0, 'v'},
 		{0, 0, 0, 0}
 	};
 
@@ -134,7 +137,7 @@ string &sInputFile, string &sOutputFile, bool &bIsMod, int &nCntThread, bool &bI
 	while (1) 
 	{   
 		int option_index = 0;
-		c = getopt_long(argc, argv, "b:i:o:t:mq", long_options, &option_index);
+		c = getopt_long(argc, argv, "v:b:i:o:t:mq", long_options, &option_index);
 		if (c == -1)    break;
 		char *pcEnd;
 		switch (c) 
@@ -156,6 +159,9 @@ string &sInputFile, string &sOutputFile, bool &bIsMod, int &nCntThread, bool &bI
 				break;
 			case 't':
 				nCntThread = strtol(optarg, &pcEnd, 10);
+				break;
+			case 'v':
+				dVaf = strtod(optarg, &pcEnd);
 				break;
 			case 'q':
 				bIsDebug = true;
