@@ -11,7 +11,7 @@ using namespace std;
 /*
 
 - To Do:
-  -- test
+  -- change variable name front strand to forward strand
   
 - Changelog:
   -- Date Mar-24-2021 SeokCholHong shulkhorn@gmail.com
