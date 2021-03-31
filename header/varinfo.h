@@ -41,15 +41,17 @@ struct QCINFO
 	uint16_t nFrontC;
 	uint16_t nFrontG;
 	uint16_t nFrontT;
-	uint16_t nFrontIndel;
+	uint16_t nForwardIns;
+	uint16_t nForwardDel;
 	uint16_t nReverseA;
 	uint16_t nReverseC;
 	uint16_t nReverseG;
 	uint16_t nReverseT;
-	uint16_t nReverseIndel;
+	uint16_t nReverseIns;
+	uint16_t nReverseDel;
 	QCINFO(){
-		nFrontA = nFrontC = nFrontG = nFrontT = nFrontIndel = 0;
-		nReverseA = nReverseC = nReverseG = nReverseT = nReverseIndel = 0;
+		nFrontA = nFrontC = nFrontG = nFrontT = nForwardIns = nForwardDel = 0;
+		nReverseA = nReverseC = nReverseG = nReverseT = nReverseIns = nReverseDel = 0;
 	}
 };
 
