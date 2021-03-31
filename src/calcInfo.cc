@@ -11,7 +11,10 @@ using namespace std;
 /*
 
 - To Do:
-  -- change variable name front strand to forward strand
+  -- change ref/alt conditions in contingency table.
+     number of alt is counted only when the allele on the locus
+	 is exactly same as the alt allele.
+  -- change variable name front strand to forward strand.
   
 - Changelog:
   -- Date Mar-24-2021 SeokCholHong shulkhorn@gmail.com

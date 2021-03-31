@@ -116,7 +116,7 @@ private:
 	
 	// calc info
 	bool DelIns(int, int);
-	bool GetRead(bam1_t*, int, int);
+	string GetRead(bam1_t*, int);
 
 	bool GetAnalysis(QCINFO &,string);
 	bool GetNb(bam1_t *, int, QCINFO &);
