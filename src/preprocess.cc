@@ -4,6 +4,16 @@
 using namespace std;
 pthread_mutex_t mutex_temp = PTHREAD_MUTEX_INITIALIZER;
 
+/*
+
+- To Do:
+  -- get read info for multiple loci
+  
+- Changelog:
+  -- Date Mar-30-2021 SeokCholHong shulkhorn@gmail.com
+     --- GetRead
+
+*/
 
 bool CINFO::ModVariant()
 {
@@ -66,11 +76,19 @@ bool CINFO::DelIns(int nSIdx, int nEIdx)
 		b = bam_init1();
 		bamIter = bam_iter_query(bamIndex, nChr, nPos-1, nPos);
 		int nRet;
+
+		cout << nChr << " " << nPos << endl;
 		while((nRet = bam_iter_read(finBam, bamIter, b)) >= 0)
 		{
-			GetRead(b, nPos, nPos+1);
-			break;
-
+			string sSeq = "";
+			for(int j=nPos; j<=nPos+1; j++){
+				int nLoc = j - (b->core.pos+1);
+				if(0<=nLoc){
+					if(GetRead(b, nLoc)=="") break;
+					sSeq+=GetRead(b, nLoc);
+				}
+			}
+			cout << sSeq << endl;
 		}
 
 
@@ -85,30 +103,68 @@ bool CINFO::DelIns(int nSIdx, int nEIdx)
 	return false;
 }
 
-bool CINFO::GetRead(bam1_t *b, int nSPos, nEPos)
+string CINFO::GetRead(bam1_t *b, int nPos)
 {
+	string sSeq="";
 	//cigar
-	uint32_t nTemp = 0;
-	int l, nPl, nPreAlign;
-	for(l=b->core.l_qname, nPl=1, nPreAlign=0;
+	uint32_t nTemp=0;
+	int l,nPl,nPreAlgn;
+	for(l=b->core.l_qname, nPl=1, nPreAlgn = 0;
 		l<(b->core.l_qname + (b->core.n_cigar*4));
-		l++, nPl++)
-	{
+		l++, nPl++){
 		int nChk = nPl%4;
 		if(nChk==0){
 			nTemp = (b->data[l]<<24) | nTemp;
 
-
-
+			int nAlgn = (nTemp>>4);
+			int op = nTemp&0xf;
+			if(op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF){
+				nPreAlgn += nAlgn;
+				if(nPos<nPreAlgn)	break;
+			}
+			else if(op == BAM_CINS){
+				if(nPos<nPreAlgn)	break;
+				nPos += nAlgn;
+				nPreAlgn += nAlgn;
+			}
+			else if(op == BAM_CDEL){
+				if(nPreAlgn<=nPos && nPos<nPreAlgn+nAlgn){
+					return sSeq;
+				}
+				else if(nPos>=nPreAlgn+nAlgn){
+					nPos -= nAlgn;
+				}
+				else if(nPos<nPreAlgn)	break;
+			}
+			else if(op == BAM_CSOFT_CLIP || op == BAM_CPAD){
+				if(nPos<nPreAlgn)	break;
+				nPos += nAlgn;
+				nPreAlgn += nAlgn;
+			}
+			else if(op == BAM_CREF_SKIP){
+				if(nPos<nPreAlgn)	break;
+				nPos += nAlgn;
+				nPreAlgn += nAlgn;
+			}
+			else if(op == BAM_CHARD_CLIP){
+			}
 		}
-			
+		else if(nChk==1)	nTemp = b->data[l];
+		else if(nChk==2)	nTemp = (b->data[l]<<8) | nTemp;
+		else if(nChk==3)	nTemp = (b->data[l]<<16) | nTemp;
 	}
+	if(nPos>=b->core.l_qseq)	return sSeq;
 
+	unsigned char ucBase = bam1_seqi(bam1_seq(b), nPos);
+	if     (ucBase == 0x01)	sSeq="A";
+	else if(ucBase == 0x02)	sSeq="C";
+	else if(ucBase == 0x04)	sSeq="G";
+	else if(ucBase == 0x08)	sSeq="T";
+	else if(ucBase == 0x0F)	sSeq="N";
+	else
+		throw std::logic_error("ERROR: sequence error. It deosn't belong to ACGTN (in function GetRead())");
 
-
-
-
-	return false;
+	return sSeq;
 }
 
 
