@@ -163,7 +163,6 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 			int nAlgn = (nTemp>>4);//the higher 28 bits : length of the specific op of CIGAR
 			int op = nTemp&0xf;//the lower 4 bits gives a CIGAR operation
 			if(op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF){
-				cout << nAlgn << "M";
 				nPreAlgn += nAlgn;
 				if(nPos<nPreAlgn){
 					if(nPos==nPreAlgn-1) bIsFit = true;
@@ -179,7 +178,6 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 				nPreAlgn += nAlgn;
 			}
 			else if(op == BAM_CDEL){//deletion
-				cout << nAlgn << "D";
 				if(nPreAlgn<=nPos && nPos<nPreAlgn+nAlgn){
 					return true;
 				}

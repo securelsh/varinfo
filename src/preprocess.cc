@@ -77,7 +77,6 @@ bool CINFO::DelIns(int nSIdx, int nEIdx)
 		bamIter = bam_iter_query(bamIndex, nChr, nPos-1, nPos);
 		int nRet;
 
-		cout << nChr << " " << nPos << endl;
 		while((nRet = bam_iter_read(finBam, bamIter, b)) >= 0)
 		{
 			string sSeq = "";
