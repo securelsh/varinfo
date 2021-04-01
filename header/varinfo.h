@@ -41,17 +41,17 @@ struct QCINFO
 	uint16_t nFrontC;
 	uint16_t nFrontG;
 	uint16_t nFrontT;
-	uint16_t nForwardIns;
-	uint16_t nForwardDel;
 	uint16_t nReverseA;
 	uint16_t nReverseC;
 	uint16_t nReverseG;
 	uint16_t nReverseT;
-	uint16_t nReverseIns;
-	uint16_t nReverseDel;
+	vector<string> vsForwardIns;
+	vector<uint16_t> vnForwardDel;
+	vector<string> vsReverseIns;
+	vector<uint16_t> vnReverseDel;
 	QCINFO(){
-		nFrontA = nFrontC = nFrontG = nFrontT = nForwardIns = nForwardDel = 0;
-		nReverseA = nReverseC = nReverseG = nReverseT = nReverseIns = nReverseDel = 0;
+		nFrontA = nFrontC = nFrontG = nFrontT = 0;
+		nReverseA = nReverseC = nReverseG = nReverseT = 0;
 	}
 };
 
@@ -120,7 +120,7 @@ private:
 	bool DelIns(int, int);
 	string GetRead(bam1_t*, int);
 
-	bool GetAnalysis(QCINFO &,string);
+	bool GetAnalysis(QCINFO &,string,string);
 	bool GetNb(bam1_t *, int, QCINFO &);
 	void* AlleleDist(int);
 	static void *AlleleDist_helper(void *object)
