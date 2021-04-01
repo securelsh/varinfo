@@ -11,12 +11,12 @@ using namespace std;
 /*
 
 - To Do:
-  -- change ref/alt conditions in contingency table.
-     number of alt is counted only when the allele on the locus
-	 is exactly same as the alt allele.
   -- change variable name front strand to forward strand.
   
 - Changelog:
+  -- Date Mar-31-2021 SeokCholHong shulkhorn@gmail.com
+     --- changed ref/alt conditions in contingency table. alt is counted based on adi alt
+
   -- Date Mar-24-2021 SeokCholHong shulkhorn@gmail.com
      --- fill variant info to VARIANT struct
 
@@ -107,19 +107,17 @@ void* CINFO::AlleleDist(int nId)
 
 bool CINFO::GetVarInfo(int nIdx, string sChr, int nChr, int nPos, string sRef, string sAlt, bam_index_t *bamIndex, bamFile finBam)
 {
-	// read bam file
 	bam_iter_t bamIter;
 	bam1_t *b;
 	b = bam_init1();
-	bamIter = bam_iter_query(bamIndex, nChr, nPos-1, nPos);// nSPos<= locus <=nEPos
+	bamIter = bam_iter_query(bamIndex, nChr, nPos-1, nPos);
 
 	QCINFO QcInfo;
 	int nRet;
 	while((nRet = bam_iter_read(finBam, bamIter, b)) >= 0){
 		GetNb(b, nPos - (b->core.pos+1), QcInfo);
-		cout << endl;
 	}
-	GetAnalysis(QcInfo, sRef);
+	GetAnalysis(QcInfo, sRef, sAlt);
 
 	m_Input.vfVaf[nIdx] = QcInfo.fVaf;
 	m_Input.vfStrandBias[nIdx] = QcInfo.fStrandBias;
@@ -157,26 +155,21 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 			int nAlgn = (nTemp>>4);
 			int op = nTemp&0xf;
 			if(op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF){
-				cout << nAlgn << "M";
 				nPreAlgn += nAlgn;
 				if(nPos<nPreAlgn){
-					if(nPos==nPreAlgn-1)
-						bIsFit = true;
+					if(nPos==nPreAlgn-1) bIsFit = true;
 					break;
 				}
 			}
 			else if(op == BAM_CINS){
-				cout << nAlgn << "I";
 				if(nPos<nPreAlgn){
-					if(nPos==nPreAlgn-1)
-						bIsFit = true;
+					if(nPos==nPreAlgn-1) bIsFit = true;
 					break;
 				}
 				nPos += nAlgn;
 				nPreAlgn += nAlgn;
 			}
 			else if(op == BAM_CDEL){
-				cout << nAlgn << "D";
 				if(nPreAlgn<=nPos && nPos<nPreAlgn+nAlgn){
 					return true;
 				}
@@ -184,15 +177,13 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 					nPos -= nAlgn;
 				}
 				else if(nPos<nPreAlgn){
-					if(nPos==nPreAlgn-1)
-						bIsFit = true;
+					if(nPos==nPreAlgn-1) bIsFit = true;
 					break;
 				}
 			}
 			else if(op == BAM_CSOFT_CLIP || op == BAM_CPAD){
 				if(nPos<nPreAlgn){
-					if(nPos==nPreAlgn-1)
-						bIsFit = true;
+					if(nPos==nPreAlgn-1) bIsFit = true;
 					break;
 				}
 				nPos += nAlgn;
@@ -200,8 +191,7 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 			}
 			else if(op == BAM_CREF_SKIP){
 				if(nPos<nPreAlgn){
-					if(nPos==nPreAlgn-1)
-						bIsFit = true;
+					if(nPos==nPreAlgn-1) bIsFit = true;
 					break;
 				}
 				nPos += nAlgn;
@@ -218,22 +208,22 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 
 	bool bIsIns=false;
 	bool bIsDel=false;
+	int nIndelLen;
 	if(bIsFit){		
 		while(l<(b->core.l_qname + (b->core.n_cigar*4))){
 			l++, nPl++;
 			int nChk = nPl%4;
 			if(nChk==0){
 				nTemp = (b->data[l]<<24) | nTemp;
-				int nAlgn = (nTemp>>4);
+				nIndelLen = (nTemp>>4);
 				int op = nTemp&0xf;
 				if(op == BAM_CINS){
-					cout << nAlgn<<"I";
 					bIsIns=true;
 				}
 				else if(op == BAM_CDEL){
-					cout << nAlgn<<"D";
 					bIsDel=true;
 				}
+				break;
 			}
 			else if(nChk==1)	nTemp = b->data[l];
 			else if(nChk==2)	nTemp = (b->data[l]<<8) | nTemp;
@@ -244,9 +234,20 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 	if(bam1_strand(b))
 	{
 		if(bIsIns){
-			BamInfo.nReverseIns++;
+			string sInsSeq="";
+			for(int len=0;len<=nIndelLen;len++){
+				unsigned char ucBase = bam1_seqi(bam1_seq(b), nPos+len);
+				if     (ucBase == 0x01)	sInsSeq+="A";
+				else if(ucBase == 0x02)	sInsSeq+="C";
+				else if(ucBase == 0x04)	sInsSeq+="G";
+				else if(ucBase == 0x08)	sInsSeq+="T";
+				else if(ucBase == 0x0F)	sInsSeq+="N";
+				else
+					throw std::logic_error("ERROR: sequence error. It deosn't belong to ACGTN (in function CCOMPDP::GetNb():64)");
+			}
+			BamInfo.vsReverseIns.push_back(sInsSeq);
 		} else if(bIsDel) {
-			BamInfo.nReverseDel++;
+			BamInfo.vnReverseDel.push_back(nIndelLen);
 		} else {
 			unsigned char ucBase = bam1_seqi(bam1_seq(b), nPos);
 			if     (ucBase == 0x01)	BamInfo.nReverseA++;
@@ -261,9 +262,20 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 	else
 	{
 		if(bIsIns){
-			BamInfo.nForwardIns++;
+			string sInsSeq="";
+			for(int len=0;len<=nIndelLen;len++){
+				unsigned char ucBase = bam1_seqi(bam1_seq(b), nPos+len);
+				if     (ucBase == 0x01)	sInsSeq+="A";
+				else if(ucBase == 0x02)	sInsSeq+="C";
+				else if(ucBase == 0x04)	sInsSeq+="G";
+				else if(ucBase == 0x08)	sInsSeq+="T";
+				else if(ucBase == 0x0F)	sInsSeq+="N";
+				else
+					throw std::logic_error("ERROR: sequence error. It deosn't belong to ACGTN (in function CCOMPDP::GetNb():64)");
+			}
+			BamInfo.vsForwardIns.push_back(sInsSeq);
 		} else if(bIsDel) {
-			BamInfo.nForwardDel++;
+			BamInfo.vnForwardDel.push_back(nIndelLen);
 		} else {
 			unsigned char ucBase = bam1_seqi(bam1_seq(b), nPos);
 			if     (ucBase == 0x01)	BamInfo.nFrontA++;
@@ -275,6 +287,7 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 				throw std::logic_error("ERROR: sequence error. It deosn't belong to ACGTN (in function CCOMPDP::GetNb():64)");
 		}
 	}
+	
 	BamInfo.vnReadLen.push_back(b->core.l_qseq);
 	char *nBaseQual = (char*)calloc(b->core.l_qseq, 1);
 	memcpy(nBaseQual, bam1_qual(b), b->core.l_qseq);
@@ -284,7 +297,7 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 	return 1;
 }
 
-bool CINFO::GetAnalysis(QCINFO &QcInfo, string sRef){
+bool CINFO::GetAnalysis(QCINFO &QcInfo, string sRef, string sAlt){
 	int nFR = 0;
 	int nFA = 0;
 	int nRR = 0;
@@ -294,42 +307,105 @@ bool CINFO::GetAnalysis(QCINFO &QcInfo, string sRef){
 	uint16_t nFrontC       = QcInfo.nFrontC    ;
 	uint16_t nFrontG       = QcInfo.nFrontG    ;
 	uint16_t nFrontT       = QcInfo.nFrontT    ;
-	uint16_t nForwardIns   = QcInfo.nForwardIns;
-	uint16_t nForwardDel   = QcInfo.nForwardDel;
+	uint16_t nForwardIns   = QcInfo.vsForwardIns.size();
+	uint16_t nForwardDel   = QcInfo.vnForwardDel.size();
 	uint16_t nReverseA     = QcInfo.nReverseA  ;
 	uint16_t nReverseC     = QcInfo.nReverseC  ;
 	uint16_t nReverseG     = QcInfo.nReverseG  ;
 	uint16_t nReverseT     = QcInfo.nReverseT  ;
-	uint16_t nReverseIns   = QcInfo.nReverseIns;
-	uint16_t nReverseDel   = QcInfo.nReverseDel;
+	uint16_t nReverseIns   = QcInfo.vsReverseIns.size();
+	uint16_t nReverseDel   = QcInfo.vnReverseDel.size();
 
-	if(sRef=="A"){
-		nFR = nFrontA;
-		nFA = nFrontC+nFrontG+nFrontT+nForwardIns+nForwardDel;
-		nRR = nReverseA;
-		nRA = nReverseC+nReverseG+nReverseT+nReverseIns+nReverseDel;
-	}
-	else if(sRef=="C"){
-		nFR = nFrontC;
-		nFA = nFrontA+nFrontG+nFrontT+nForwardIns+nForwardDel;
-		nRR = nReverseC;
-		nRA = nReverseA+nReverseG+nReverseT+nReverseIns+nReverseDel;
-	}
-	else if(sRef=="G"){
-		nFR = nFrontG;
-		nFA = nFrontC+nFrontA+nFrontT+nForwardIns+nForwardDel;
-		nRR = nReverseG;
-		nRA = nReverseC+nReverseA+nReverseT+nReverseIns+nReverseDel;
-	}
-	else if(sRef=="T"){
-		nFR = nFrontT;
-		nFA = nFrontC+nFrontG+nFrontA+nForwardIns+nForwardDel;
-		nRR = nReverseT;
-		nRA = nReverseC+nReverseG+nReverseA+nReverseIns+nReverseDel;
-	}
-	QcInfo.fStrandBias = STATTEST::GetFisherPvalue(nFR,nRR,nFA,nRA);
-	QcInfo.fVaf = (float)(nFA+nRA)/(nFR+nRR+nFA+nRA);
+	int nRefSize=sRef.size();
+	int nAltSize=sAlt.size();
+	if(nRefSize<nAltSize){
+		int nMatch=0;
+		for(int i=0;i<nForwardIns;i++){
+			if(QcInfo.vsForwardIns[i]==sAlt)	nMatch++;
+		}
+		nFR = nFrontA+nFrontC+nFrontG+nFrontT+nForwardDel+(nForwardIns-nMatch);
+		nFA = nMatch;
+		nMatch=0;
+		for(int i=0;i<nReverseIns;i++){
+			if(QcInfo.vsReverseIns[i]==sAlt)	nMatch++;
+		}
+		nRR = nReverseA+nReverseC+nReverseG+nReverseT+nReverseDel+(nReverseIns-nMatch);
+		nRA = nMatch;
 
+		QcInfo.fStrandBias = STATTEST::GetFisherPvalue(nFR,nRR,nFA,nRA);
+	}
+	else if(nRefSize>nAltSize){
+		int nMatch=0;
+		for(int i=0;i<nForwardDel;i++){
+			if(QcInfo.vnForwardDel[i]==(nRefSize-nAltSize))		nMatch++;
+		}
+		nFR = nFrontA+nFrontC+nFrontG+nFrontT+nForwardIns+(nForwardDel-nMatch);
+		nFA = nMatch;
+		nMatch=0;
+		for(int i=0;i<nReverseDel;i++){
+			if(QcInfo.vnReverseDel[i]==(nRefSize-nAltSize))		nMatch++;
+		}
+		nRR = nReverseA+nReverseC+nReverseG+nReverseT+nReverseIns+(nReverseDel-nMatch);
+		nRA = nMatch;
+
+		QcInfo.fStrandBias = STATTEST::GetFisherPvalue(nFR,nRR,nFA,nRA);
+	}
+	else{
+		if(sAlt=="A"){
+			nFA = nFrontA;
+			nFR = nFrontC+nFrontG+nFrontT+nForwardIns+nForwardDel;
+			nRA = nReverseA;
+			nRR = nReverseC+nReverseG+nReverseT+nReverseIns+nReverseDel;
+		}
+		else if(sAlt=="C"){
+			nFA = nFrontC;
+			nFR = nFrontA+nFrontG+nFrontT+nForwardIns+nForwardDel;
+			nRA = nReverseC;
+			nRR = nReverseA+nReverseG+nReverseT+nReverseIns+nReverseDel;
+		}
+		else if(sAlt=="G"){
+			nFA = nFrontG;
+			nFR = nFrontC+nFrontA+nFrontT+nForwardIns+nForwardDel;
+			nRA = nReverseG;
+			nRR = nReverseC+nReverseA+nReverseT+nReverseIns+nReverseDel;
+		}
+		else if(sAlt=="T"){
+			nFA = nFrontT;
+			nFR = nFrontC+nFrontG+nFrontA+nForwardIns+nForwardDel;
+			nRA = nReverseT;
+			nRR = nReverseC+nReverseG+nReverseA+nReverseIns+nReverseDel;
+		}
+		QcInfo.fStrandBias = STATTEST::GetFisherPvalue(nFR,nRR,nFA,nRA);
+		QcInfo.fVaf = (float)(nFA+nRA)/(nFR+nRR+nFA+nRA);
+	}
+
+	if(nRefSize!=nAltSize){
+		if(sRef[0]=='A'){
+			nFR = nFrontA;
+			nFA = nFrontC+nFrontG+nFrontT+nForwardIns+nForwardDel;
+			nRR = nReverseA;
+			nRA = nReverseC+nReverseG+nReverseT+nReverseIns+nReverseDel;
+		}
+		else if(sRef[0]=='C'){
+			nFR = nFrontC;
+			nFA = nFrontA+nFrontG+nFrontT+nForwardIns+nForwardDel;
+			nRR = nReverseC;
+			nRA = nReverseA+nReverseG+nReverseT+nReverseIns+nReverseDel;
+		}
+		else if(sRef[0]=='G'){
+			nFR = nFrontG;
+			nFA = nFrontC+nFrontA+nFrontT+nForwardIns+nForwardDel;
+			nRR = nReverseG;
+			nRA = nReverseC+nReverseA+nReverseT+nReverseIns+nReverseDel;
+		}
+		else if(sRef[0]=='T'){
+			nFR = nFrontT;
+			nFA = nFrontC+nFrontG+nFrontA+nForwardIns+nForwardDel;
+			nRR = nReverseT;
+			nRA = nReverseC+nReverseG+nReverseA+nReverseIns+nReverseDel;
+		}
+		QcInfo.fVaf = (float)(nFA+nRA)/(nFR+nRR+nFA+nRA);
+	}
 	return true;
 }
 
