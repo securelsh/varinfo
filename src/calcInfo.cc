@@ -11,12 +11,6 @@ using namespace std;
 /*
 
 - To Do:
-<<<<<<< HEAD
-  -- change ref/alt conditions in contingency table.
-     number of alt is counted only when the allele on the locus
-	 is exactly same as the alt allele.
-=======
->>>>>>> 94d586ea3c98ecc174e4b037623f86a8f140a5e1
   -- change variable name front strand to forward strand.
   
 - Changelog:
@@ -122,7 +116,6 @@ bool CINFO::GetVarInfo(int nIdx, string sChr, int nChr, int nPos, string sRef, s
 	int nRet;
 	while((nRet = bam_iter_read(finBam, bamIter, b)) >= 0){
 		GetNb(b, nPos - (b->core.pos+1), QcInfo);
-		cout << endl;
 	}
 	GetAnalysis(QcInfo, sRef, sAlt);
 
@@ -151,17 +144,16 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 {
 	bool bIsFit = false;
 	uint32_t nTemp=0;
-	int l,nPl,nPreAlgn; // prealign: length of past op of CIGAR
-	// indicates correct position of nPos. if the indicator reaches the nPos, the loop stops.
+	int l,nPl,nPreAlgn;
 	for(l=b->core.l_qname, nPl=1, nPreAlgn = 0;
-		l<(b->core.l_qname + (b->core.n_cigar*4));//till the bit position including cigar value
+		l<(b->core.l_qname + (b->core.n_cigar*4));
 		l++, nPl++){
 		int nChk = nPl%4;
 		if(nChk==0){
 			nTemp = (b->data[l]<<24) | nTemp;
 
-			int nAlgn = (nTemp>>4);//the higher 28 bits : length of the specific op of CIGAR
-			int op = nTemp&0xf;//the lower 4 bits gives a CIGAR operation
+			int nAlgn = (nTemp>>4);
+			int op = nTemp&0xf;
 			if(op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF){
 				nPreAlgn += nAlgn;
 				if(nPos<nPreAlgn){
@@ -177,7 +169,7 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 				nPos += nAlgn;
 				nPreAlgn += nAlgn;
 			}
-			else if(op == BAM_CDEL){//deletion
+			else if(op == BAM_CDEL){
 				if(nPreAlgn<=nPos && nPos<nPreAlgn+nAlgn){
 					return true;
 				}
@@ -206,7 +198,6 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 				nPreAlgn += nAlgn;
 			}
 			else if(op == BAM_CHARD_CLIP){
-				//hard clipping
 			}
 		}
 		else if(nChk==1)	nTemp = b->data[l];
@@ -240,7 +231,7 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 		}
 	}
 
-	if(bam1_strand(b)) // reverse
+	if(bam1_strand(b))
 	{
 		if(bIsIns){
 			string sInsSeq="";
@@ -258,13 +249,12 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 		} else if(bIsDel) {
 			BamInfo.vnReverseDel.push_back(nIndelLen);
 		} else {
-			// unsigned char ucBase = (b->data[(b->core.l_qname + (b->core.n_cigar*4))+(nPos>>1)] >> ((~nPos&1)<<2) & 0xf);
 			unsigned char ucBase = bam1_seqi(bam1_seq(b), nPos);
 			if     (ucBase == 0x01)	BamInfo.nReverseA++;
 			else if(ucBase == 0x02)	BamInfo.nReverseC++;
 			else if(ucBase == 0x04)	BamInfo.nReverseG++;
 			else if(ucBase == 0x08)	BamInfo.nReverseT++;
-			else if(ucBase == 0x0F)	return 0; //N : missing, no depth
+			else if(ucBase == 0x0F)	return 0;
 			else
 				throw std::logic_error("ERROR: sequence error. It deosn't belong to ACGTN (in function CCOMPDP::GetNb():64)");
 		}
@@ -292,13 +282,12 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 			else if(ucBase == 0x02)	BamInfo.nFrontC++;
 			else if(ucBase == 0x04)	BamInfo.nFrontG++;
 			else if(ucBase == 0x08)	BamInfo.nFrontT++;
-			else if(ucBase == 0x0F)	return 0; //N : missing, no depth
+			else if(ucBase == 0x0F)	return 0;
 			else
 				throw std::logic_error("ERROR: sequence error. It deosn't belong to ACGTN (in function CCOMPDP::GetNb():64)");
 		}
 	}
 	
-	// read length
 	BamInfo.vnReadLen.push_back(b->core.l_qseq);
 	char *nBaseQual = (char*)calloc(b->core.l_qseq, 1);
 	memcpy(nBaseQual, bam1_qual(b), b->core.l_qseq);

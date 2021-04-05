@@ -6,6 +6,15 @@ using namespace std;
 
 bool CINFO::Report()
 {
+	// output mod adiscan
+	ofstream fout;
+	fout.open(m_sOutputFile.c_str());
+	for(int i=0; i<(int)m_Input.vbIsPass.size(); i++)
+	{
+		if(m_Input.vbIsPass[i])		fout << m_Input.vsRaw[i] << endl;
+	}
+	fout.close();
+
 	ReportBamInfo();
 
 	return true;
@@ -20,8 +29,9 @@ bool CINFO::ReportBamInfo()
 	fout << "\t\"sampleName\" : \"" << m_sBamFile.substr(m_sBamFile.find_last_of('/')+1) << "\","<< endl;
 	fout << "\t\"bamInfo\" : [" << endl;
 
-	for(unsigned int i=0; i<m_Input.vsChr.size()-1; i++)
+	for(unsigned int i=0; i<m_Input.vsChr.size(); i++)
 	{
+		if(!m_Input.vbIsPass[i])	continue;
 		fout << "\t\t{" << endl;
 		fout << "\t\t\t\"chr\" : \"" 		<< m_Input.vsChr[i] << "\"" << endl;
 		fout << "\t\t\t\"pos\" : " 			<< m_Input.vnPos[i] << endl;
@@ -43,28 +53,6 @@ bool CINFO::ReportBamInfo()
 		fout << (int)m_Input.v2nBaseQ[i][m_Input.v2nBaseQ[i].size()-1] << "]" << endl;
 		fout << "\t\t}," << endl;
 	}
-	int nLast = m_Input.vsChr.size()-1;
-	fout << "\t\t{" << endl;
-	fout << "\t\t\t\"chr\" : \"" 		<< m_Input.vsChr[nLast] << "\"" << endl;
-	fout << "\t\t\t\"pos\" : " 			<< m_Input.vnPos[nLast] << endl;
-	fout << "\t\t\t\"ref\" : \"" 		<< m_Input.vsRef[nLast] << "\"" << endl;
-	fout << "\t\t\t\"alt\" : \"" 		<< m_Input.vsAlt[nLast] << "\"" << endl;
-	fout << "\t\t\t\"vaf\" : "	 		<< m_Input.vfVaf[nLast] << endl;
-	fout << "\t\t\t\"strandBias\" : "	<< m_Input.vfStrandBias[nLast] << endl;
-	fout << "\t\t\t\"readLen\" : [";
-	for(unsigned int j=0; j<m_Input.v2nReadLen[nLast].size()-1; j++)
-		fout << m_Input.v2nReadLen[nLast][j] << ",";
-	fout << m_Input.v2nReadLen[nLast][m_Input.v2nReadLen[nLast].size()-1] << "]" << endl;
-	fout << "\t\t\t\"mapQ\" : [";
-	for(unsigned int j=0; j<m_Input.v2nMapQ[nLast].size()-1; j++)
-		fout << (int)m_Input.v2nMapQ[nLast][j] << ",";
-	fout << (int)m_Input.v2nMapQ[nLast][m_Input.v2nMapQ[nLast].size()-1] << "]" << endl;
-	fout << "\t\t\t\"baseQ\" : [";
-	for(unsigned int j=0; j<m_Input.v2nBaseQ[nLast].size()-1; j++)
-		fout << (int)m_Input.v2nBaseQ[nLast][j] << ",";
-	fout << (int)m_Input.v2nBaseQ[nLast][m_Input.v2nBaseQ[nLast].size()-1] << "]" << endl;
-	fout << "\t\t}," << endl;
-
 	fout << "\t]" << endl;
 	fout << "}" << endl;
 

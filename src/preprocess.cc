@@ -1,5 +1,7 @@
 #include "../header/varinfo.h"
 #include "../header/bio_files.h"
+#include "../header/statisticaltest.h"
+
 
 using namespace std;
 pthread_mutex_t mutex_temp = PTHREAD_MUTEX_INITIALIZER;
@@ -34,7 +36,6 @@ bool CINFO::ModVariant()
 			this->DelIns(i, nIdx);
 			i = nIdx;
 
-			break;
 		}
 
 
@@ -60,6 +61,7 @@ bool CINFO::DelIns(int nSIdx, int nEIdx)
 	string sChr = this->m_Input.vsChr[nSIdx];
 	int nChr = ConvertChrToTid(sChr, bamHeader);
 	int nPos = this->m_Input.vnPos[nSIdx];
+
 	if(nChr == -1)
 	{
 		cout << sChr << "(" << nChr << "):" << nPos << endl;
@@ -70,13 +72,19 @@ bool CINFO::DelIns(int nSIdx, int nEIdx)
 
 	for(int i=nSIdx; i<nEIdx; i++)
 	{
+		nPos = this->m_Input.vnPos[i];
+		string sVarSeq = this->m_Input.vsAlt[i];
+		sVarSeq += this->m_Input.vsAlt[i+1];
 		// extract reads
 		bam_iter_t bamIter;
 		bam1_t *b;
 		b = bam_init1();
 		bamIter = bam_iter_query(bamIndex, nChr, nPos-1, nPos);
 		int nRet;
-
+		int nOO = 0;
+		int nAO = 0;
+		int nOA = 0;
+		int nAA = 0;
 		while((nRet = bam_iter_read(finBam, bamIter, b)) >= 0)
 		{
 			string sSeq = "";
@@ -87,13 +95,56 @@ bool CINFO::DelIns(int nSIdx, int nEIdx)
 					sSeq+=GetRead(b, nLoc);
 				}
 			}
-			cout << sSeq << endl;
-		}
+			//cout << sSeq << " ";
+			if(sSeq[0] == sVarSeq[0] && sSeq[1] == sVarSeq[1])		nAA++;
+			if(sSeq[0] == sVarSeq[0] && sSeq[1] != sVarSeq[1])		nAO++;
+			if(sSeq[0] != sVarSeq[0] && sSeq[1] == sVarSeq[1])		nOA++;
+			if(sSeq[0] != sVarSeq[0] && sSeq[1] != sVarSeq[1])		nOO++;
 
+
+		}
+		int nOriOO = nOO;
+		int nOriOA = nOA;
+		int nOriAO = nAO;
+		int nOriAA = nAA;
+		//cout << endl;
+		if(m_bIsDebug)	cout << "(" << nOO << "," << nAO << "," << nOA << "," << nAA << ")" << endl;
+		if(m_bIsDebug)	cout << m_Input.vdVaf[i] << "\t" << m_Input.vdVaf[i+1] << endl;
+		nAO *= m_Input.vdVaf[i];
+		nOA *= m_Input.vdVaf[i+1];
+		nOO *= m_Input.vdVaf[i] * m_Input.vdVaf[i+1];
+		double dPvalue = (double)STATTEST::GetFisherPvalue(nOO, nAO, nOA, nAA);
+		if(m_bIsDebug)	cout << "P-value: " << dPvalue << " (" << nOO << "," << nAO << "," << nOA << "," << nAA << ")" << endl;
 
 		// determine whether SNPs or Del-Ins
+		if(dPvalue < 0.05)
+		{
+			string sRaw = "chr " + this->m_Input.vsChr[i] + "_" + this->to_string(this->m_Input.vnPos[i]);
+			sRaw += "\t" + this->to_string(nOriOO) + " " + this->to_string(nOriAA);
+			sRaw += "\t" + this->m_Input.vsRef[i] + this->m_Input.vsRef[i+1] + " " + sVarSeq;
 
+			this->m_Input.vbIsPass[i] = false;
+			this->m_Input.vnPos[i+1]--;
+			this->m_Input.vsRef[i+1] = this->m_Input.vsRef[i] + this->m_Input.vsRef[i+1];
+			this->m_Input.vsAlt[i+1] = this->m_Input.vsAlt[i] + this->m_Input.vsAlt[i+1];
+			this->m_Input.vdVaf[i+1] = (double)nOriAA / (double)(nOriOO+nOriAA);
+			
 
+			char *pcEnd;
+			vector<string> vsWord1, vsWord2, vsT1, vsT2;
+			Parsing(vsWord1, m_Input.vsRaw[i], "\t");
+			Parsing(vsWord2, m_Input.vsRaw[i+1], "\t");
+			Parsing(vsT1, vsWord1[2], " ");
+			Parsing(vsT2, vsWord2[2], " ");
+
+			if(vsT1[3] == "2" || vsT2[3] == "2")	sRaw += " | 2 | - | ";
+			else									sRaw += " | 3 | - | ";
+			double dScore = (strtod(vsT1[7].c_str(), &pcEnd) + strtod(vsT2[7].c_str(), &pcEnd)) / 2.0;
+			sRaw += this->to_string(dScore) + " | - 0 | -";
+
+			cout << sRaw << endl;
+			this->m_Input.vsRaw[i+1] = sRaw;	
+		}
 	}
 
 
@@ -205,7 +256,10 @@ bool CINFO::ReadInput()
 			int nRefDp = strtol(vsDepth[0].c_str(), &pcEnd, 10);
 			int nAltDp = strtol(vsDepth[1].c_str(), &pcEnd, 10);
 
-			if((double)nAltDp/(double)(nRefDp+nAltDp) < this->m_dVaf)	continue;
+			double dVaf = (double)nAltDp/(double)(nRefDp+nAltDp);
+			if(dVaf < this->m_dVaf)	continue;
+
+			this->m_Input.vdVaf.push_back(dVaf);
 
 			if(vsWord[0].substr(0,4) == "chr ")			//Adiscan format
 			{

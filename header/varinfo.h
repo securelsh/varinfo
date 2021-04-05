@@ -67,7 +67,8 @@ struct VARIANT
 	vector<int>	vnPos;
 	vector<string> vsRef;
 	vector<string> vsAlt;
-	
+	vector<double> vdVaf;
+
 	vector<string> vsRaw;
 
 	//AS IS: BAM QC Information
