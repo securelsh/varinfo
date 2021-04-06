@@ -10,23 +10,26 @@ using namespace std;
 
 /*
 
+- Maintainer:
+  [1] Seok Chol Hong shulkhorn@gmail.com
+
 - To Do:
   -- change variable name front strand to forward strand.
   
 - Changelog:
-  -- Date Apr-04-2021 SeokCholHong shulkhorn@gmail.com
+  -- Date Apr-04-2021 [1]
      --- edited fetching-info method for del-ins site
 
-  -- Date Mar-31-2021 SeokCholHong shulkhorn@gmail.com
+  -- Date Mar-31-2021 [1]
      --- changed ref/alt conditions in contingency table. alt is counted based on adi alt
 
-  -- Date Mar-24-2021 SeokCholHong shulkhorn@gmail.com
+  -- Date Mar-24-2021 [1]
      --- fill variant info to VARIANT struct
 
-  -- Date Mar-22-2021 SeokCholHong shulkhorn@gmail.com
+  -- Date Mar-22-2021 [1]
      --- make method for estimation of strand bias & VAF
 
-  -- Date Mar-16-2021 SeokCholHong shulkhorn@gmail.com
+  -- Date Mar-16-2021 [1]
      --- Extract information from BAM file
 
 */
