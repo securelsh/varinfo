@@ -37,7 +37,7 @@ bool CINFO::CalcInfo()
 	m_Input.vfStrandBias.resize(m_Input.vsChr.size());
 	m_Input.v2nReadLen.resize(m_Input.vsChr.size());
 	m_Input.v2nMapQ.resize(m_Input.vsChr.size());
-	m_Input.v2nBaseQ.resize(m_Input.vsChr.size());
+	m_Input.v2fBaseQ.resize(m_Input.vsChr.size());
 	
 	vector<DIST_THREAD> vDistThread;
 	for(int i=0; i<m_nCntThread; i++)
@@ -114,22 +114,55 @@ bool CINFO::GetVarInfo(int nIdx, string sChr, int nChr, int nPos, string sRef, s
 
 	QCINFO QcInfo;
 	int nRet;
-	while((nRet = bam_iter_read(finBam, bamIter, b)) >= 0){
-		GetNb(b, nPos - (b->core.pos+1), QcInfo);
+	if(sAlt.size()>1 && sRef.size()==sAlt.size()){
+		QcInfo.vsForwardIns.push_back("");
+		QcInfo.vsReverseIns.push_back("");
+		while((nRet = bam_iter_read(finBam, bamIter, b)) >= 0)
+		{
+			QcInfo.vfBaseQ.push_back(0);
+			if(QcInfo.vsForwardIns[QcInfo.vsForwardIns.size()-1]!="")
+				QcInfo.vsForwardIns.push_back("");
+			if(QcInfo.vsReverseIns[QcInfo.vsReverseIns.size()-1]!="")
+				QcInfo.vsReverseIns.push_back("");
+			for(int j=nPos; j<=nPos+1; j++){
+				int nLoc = j - (b->core.pos+1);
+				if(0<=nLoc){
+					if(!GetDelIns(b, nLoc, QcInfo)) break;
+				}
+			}
+			int nLast = QcInfo.vfBaseQ.size()-1;
+			QcInfo.vfBaseQ[nLast] = QcInfo.vfBaseQ[nLast]/2.0;
+		}
+		cout << sChr<<" " << nPos<<" " << sRef<<" " << sAlt << endl;
+		for(int ins=0;ins<QcInfo.vsForwardIns.size();ins++){
+			cout << QcInfo.vsForwardIns[ins]<< " ";
+		}
+		cout << endl<<endl;
+		for(int ins=0;ins<QcInfo.vsReverseIns.size();ins++){
+			cout << QcInfo.vsReverseIns[ins]<< " ";
+		}
+		cout << endl<<endl;
+
+		GetAnalysisDelIns(QcInfo, sRef, sAlt);
+		cout << QcInfo.fStrandBias << " " << m_Input.vfVaf[nIdx]<< endl;
+		exit(1);
+	} else{
+		while((nRet = bam_iter_read(finBam, bamIter, b)) >= 0){
+			GetNb(b, nPos - (b->core.pos+1), QcInfo);
+		}
+		GetAnalysis(QcInfo, sRef, sAlt);
+
+		m_Input.vfVaf[nIdx] = QcInfo.fVaf;
+		m_Input.vfStrandBias[nIdx] = QcInfo.fStrandBias;
+		m_Input.v2nReadLen[nIdx] = QcInfo.vnReadLen;
+		m_Input.v2nMapQ[nIdx] = QcInfo.vnMapQ;
+		m_Input.v2fBaseQ[nIdx] = QcInfo.vfBaseQ;
 	}
-	GetAnalysis(QcInfo, sRef, sAlt);
-
-	m_Input.vfVaf[nIdx] = QcInfo.fVaf;
-	m_Input.vfStrandBias[nIdx] = QcInfo.fStrandBias;
-	m_Input.v2nReadLen[nIdx] = QcInfo.vnReadLen;
-	m_Input.v2nMapQ[nIdx] = QcInfo.vnMapQ;
-	m_Input.v2nBaseQ[nIdx] = QcInfo.vnBaseQ;
-
-	if(QcInfo.vnMapQ.size()<1||QcInfo.vnBaseQ.size()<1){
+	if(QcInfo.vnMapQ.size()<1||QcInfo.vfBaseQ.size()<1){
 		cout << sChr << " " << nPos << endl;
 		exit(1);
 	}
-	if(m_Input.v2nMapQ[nIdx].size()<1||m_Input.v2nBaseQ[nIdx].size()<1){
+	if(m_Input.v2nMapQ[nIdx].size()<1||m_Input.v2fBaseQ[nIdx].size()<1){
 		cout << sChr << " " << nPos << endl;
 		exit(1);
 	}
@@ -291,12 +324,158 @@ bool CINFO::GetNb(bam1_t *b, int nPos, QCINFO &BamInfo)
 	BamInfo.vnReadLen.push_back(b->core.l_qseq);
 	char *nBaseQual = (char*)calloc(b->core.l_qseq, 1);
 	memcpy(nBaseQual, bam1_qual(b), b->core.l_qseq);
-	BamInfo.vnBaseQ.push_back(nBaseQual[nPos]);
+	BamInfo.vfBaseQ.push_back((float)nBaseQual[nPos]);
 	BamInfo.vnMapQ.push_back(b->core.qual);
 
 	return 1;
 }
 
+bool CINFO::GetDelIns(bam1_t *b, int nPos, QCINFO &BamInfo)
+{
+	string sNb = "";
+	bool bIsFit = false;
+	uint32_t nTemp=0;
+	int l,nPl,nPreAlgn;
+	for(l=b->core.l_qname, nPl=1, nPreAlgn = 0;
+		l<(b->core.l_qname + (b->core.n_cigar*4));
+		l++, nPl++){
+		int nChk = nPl%4;
+		if(nChk==0){
+			nTemp = (b->data[l]<<24) | nTemp;
+
+			int nAlgn = (nTemp>>4);
+			int op = nTemp&0xf;
+			if(op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF){
+				nPreAlgn += nAlgn;
+				if(nPos<nPreAlgn){
+					if(nPos==nPreAlgn-1) bIsFit = true;
+					break;
+				}
+			}
+			else if(op == BAM_CINS){
+				if(nPos<nPreAlgn){
+					if(nPos==nPreAlgn-1) bIsFit = true;
+					break;
+				}
+				nPos += nAlgn;
+				nPreAlgn += nAlgn;
+			}
+			else if(op == BAM_CDEL){
+				if(nPreAlgn<=nPos && nPos<nPreAlgn+nAlgn){
+					return false;
+				}
+				else if(nPos>=nPreAlgn+nAlgn){
+					nPos -= nAlgn;
+				}
+				else if(nPos<nPreAlgn){
+					if(nPos==nPreAlgn-1) bIsFit = true;
+					break;
+				}
+			}
+			else if(op == BAM_CSOFT_CLIP || op == BAM_CPAD){
+				if(nPos<nPreAlgn){
+					if(nPos==nPreAlgn-1) bIsFit = true;
+					break;
+				}
+				nPos += nAlgn;
+				nPreAlgn += nAlgn;
+			}
+			else if(op == BAM_CREF_SKIP){
+				if(nPos<nPreAlgn){
+					if(nPos==nPreAlgn-1) bIsFit = true;
+					break;
+				}
+				nPos += nAlgn;
+				nPreAlgn += nAlgn;
+			}
+			else if(op == BAM_CHARD_CLIP){
+			}
+		}
+		else if(nChk==1)	nTemp = b->data[l];
+		else if(nChk==2)	nTemp = (b->data[l]<<8) | nTemp;
+		else if(nChk==3)	nTemp = (b->data[l]<<16) | nTemp;
+	}
+	if(nPos>=b->core.l_qseq)	return false;
+
+	
+	
+	if(bam1_strand(b))
+	{
+		int nLast = BamInfo.vsReverseIns.size()-1;
+		unsigned char ucBase = bam1_seqi(bam1_seq(b), nPos);
+		if     (ucBase == 0x01)	BamInfo.vsReverseIns[nLast] += "A";
+		else if(ucBase == 0x02)	BamInfo.vsReverseIns[nLast] += "C";
+		else if(ucBase == 0x04)	BamInfo.vsReverseIns[nLast] += "G";
+		else if(ucBase == 0x08)	BamInfo.vsReverseIns[nLast] += "T";
+		else if(ucBase == 0x0F) {
+			BamInfo.vsReverseIns[nLast] += "N";
+			return false;
+		}
+		else
+			throw std::logic_error("ERROR: sequence error. It deosn't belong to ACGTN (in function CCOMPDP::GetNb():64)");
+	}
+	else
+	{
+		int nLast = BamInfo.vsForwardIns.size()-1;
+		unsigned char ucBase = bam1_seqi(bam1_seq(b), nPos);
+		if     (ucBase == 0x01)	BamInfo.vsForwardIns[nLast] += "A";
+		else if(ucBase == 0x02)	BamInfo.vsForwardIns[nLast] += "C";
+		else if(ucBase == 0x04)	BamInfo.vsForwardIns[nLast] += "G";
+		else if(ucBase == 0x08)	BamInfo.vsForwardIns[nLast] += "T";
+		else if(ucBase == 0x0F) {
+			BamInfo.vsForwardIns[nLast] += "N";
+			return false;
+		}
+		else
+			throw std::logic_error("ERROR: sequence error. It deosn't belong to ACGTN (in function CCOMPDP::GetNb():64)");
+	}
+
+	BamInfo.vnReadLen.push_back(b->core.l_qseq);
+	BamInfo.vnMapQ.push_back(b->core.qual);
+
+	char *nBaseQual = (char*)calloc(b->core.l_qseq, 1);
+	memcpy(nBaseQual, bam1_qual(b), b->core.l_qseq);
+	int nLast = BamInfo.vfBaseQ.size()-1;
+	BamInfo.vfBaseQ[nLast] = BamInfo.vfBaseQ[nLast]+(float)nBaseQual[nPos];
+
+	return true;
+}
+bool CINFO::GetAnalysisDelIns(QCINFO &QcInfo, string sRef, string sAlt){
+	int nFR = 0;
+	int nFA = 0;
+	int nRR = 0;
+	int nRA = 0;
+
+	uint16_t nFrontA       = QcInfo.nFrontA    ;
+	uint16_t nFrontC       = QcInfo.nFrontC    ;
+	uint16_t nFrontG       = QcInfo.nFrontG    ;
+	uint16_t nFrontT       = QcInfo.nFrontT    ;
+	uint16_t nForwardIns   = QcInfo.vsForwardIns.size();
+	uint16_t nForwardDel   = QcInfo.vnForwardDel.size();
+	uint16_t nReverseA     = QcInfo.nReverseA  ;
+	uint16_t nReverseC     = QcInfo.nReverseC  ;
+	uint16_t nReverseG     = QcInfo.nReverseG  ;
+	uint16_t nReverseT     = QcInfo.nReverseT  ;
+	uint16_t nReverseIns   = QcInfo.vsReverseIns.size();
+	uint16_t nReverseDel   = QcInfo.vnReverseDel.size();
+
+	int nMatch=0;
+	for(int i=0;i<nForwardIns;i++){
+		if(QcInfo.vsForwardIns[i]==sAlt)	nMatch++;
+	}
+	nFR = nFrontA+nFrontC+nFrontG+nFrontT+nForwardDel+(nForwardIns-nMatch);
+	nFA = nMatch;
+	nMatch=0;
+	for(int i=0;i<nReverseIns;i++){
+		if(QcInfo.vsReverseIns[i]==sAlt)	nMatch++;
+	}
+	nRR = nReverseA+nReverseC+nReverseG+nReverseT+nReverseDel+(nReverseIns-nMatch);
+	nRA = nMatch;
+
+	QcInfo.fStrandBias = STATTEST::GetFisherPvalue(nFR,nRR,nFA,nRA);
+
+	return true;
+}
 bool CINFO::GetAnalysis(QCINFO &QcInfo, string sRef, string sAlt){
 	int nFR = 0;
 	int nFA = 0;

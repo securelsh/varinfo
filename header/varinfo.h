@@ -36,7 +36,7 @@ struct QCINFO
 	float fStrandBias;
 	vector<uint16_t> vnReadLen;
 	vector<uint8_t> vnMapQ;
-	vector<uint8_t> vnBaseQ;
+	vector<float> vfBaseQ;
 	uint16_t nFrontA;
 	uint16_t nFrontC;
 	uint16_t nFrontG;
@@ -67,8 +67,7 @@ struct VARIANT
 	vector<int>	vnPos;
 	vector<string> vsRef;
 	vector<string> vsAlt;
-	vector<double> vdVaf;
-
+	
 	vector<string> vsRaw;
 
 	//AS IS: BAM QC Information
@@ -76,7 +75,7 @@ struct VARIANT
 	vector<float> vfStrandBias;				// strand bias 
 	vector<vector<uint16_t> > v2nReadLen;	// [loci][read lenths]
 	vector<vector<uint8_t> > v2nMapQ;		// [loci][mapping qualities]
-	vector<vector<uint8_t> > v2nBaseQ;		// [loci][base qualities]
+	vector<vector<float> > v2fBaseQ;		// [loci][base qualities]
 };
 
 struct DIST_THREAD
@@ -122,7 +121,9 @@ private:
 	string GetRead(bam1_t*, int);
 
 	bool GetAnalysis(QCINFO &,string,string);
+	bool GetAnalysisDelIns(QCINFO &, string, string);
 	bool GetNb(bam1_t *, int, QCINFO &);
+	bool GetDelIns(bam1_t *, int, QCINFO &);
 	void* AlleleDist(int);
 	static void *AlleleDist_helper(void *object)
 	{
