@@ -37,7 +37,7 @@ bool CINFO::ReportBamInfo()
 		fout << "\t\t\t\"pos\" : " 			<< m_Input.vnPos[i] << "," << endl;
 		fout << "\t\t\t\"ref\" : \"" 		<< m_Input.vsRef[i] << "\"," << endl;
 		fout << "\t\t\t\"alt\" : \"" 		<< m_Input.vsAlt[i] << "\"," << endl;
-		fout << "\t\t\t\"vaf\" : "	 		<< m_Input.vfVaf[i] << "," << endl;
+		fout << "\t\t\t\"vaf\" : "	 		<< m_Input.vdVaf[i] << "," << endl;
 		fout << "\t\t\t\"strandBias\" : "	<< m_Input.vfStrandBias[i] << "," << endl;
 		fout << "\t\t\t\"readLen\" : [";
 		for(unsigned int j=0; j<m_Input.v2nReadLen[i].size()-1; j++)
@@ -48,9 +48,9 @@ bool CINFO::ReportBamInfo()
 			fout << (int)m_Input.v2nMapQ[i][j] << ",";
 		fout << (int)m_Input.v2nMapQ[i][m_Input.v2nMapQ[i].size()-1] << "]," << endl;
 		fout << "\t\t\t\"baseQ\" : [";
-		for(unsigned int j=0; j<m_Input.v2nBaseQ[i].size()-1; j++)
-			fout << (int)m_Input.v2nBaseQ[i][j] << ",";
-		fout << (int)m_Input.v2nBaseQ[i][m_Input.v2nBaseQ[i].size()-1] << "]" << endl;
+		for(unsigned int j=0; j<m_Input.v2fBaseQ[i].size()-1; j++)
+			fout << m_Input.v2fBaseQ[i][j] << ",";
+		fout << m_Input.v2fBaseQ[i][m_Input.v2fBaseQ[i].size()-1] << "]" << endl;
 		if(i==m_Input.vsChr.size()-1)
 			fout << "\t\t}" << endl;
 		else

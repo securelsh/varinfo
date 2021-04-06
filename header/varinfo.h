@@ -67,11 +67,12 @@ struct VARIANT
 	vector<int>	vnPos;
 	vector<string> vsRef;
 	vector<string> vsAlt;
+	vector<double> vdVaf;
 	
 	vector<string> vsRaw;
 
 	//AS IS: BAM QC Information
-	vector<float> vfVaf;					// variant allele freq
+	// vector<float> vfVaf;					// variant allele freq
 	vector<float> vfStrandBias;				// strand bias 
 	vector<vector<uint16_t> > v2nReadLen;	// [loci][read lenths]
 	vector<vector<uint8_t> > v2nMapQ;		// [loci][mapping qualities]

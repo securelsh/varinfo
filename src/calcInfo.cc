@@ -14,6 +14,9 @@ using namespace std;
   -- change variable name front strand to forward strand.
   
 - Changelog:
+  -- Date Apr-04-2021 SeokCholHong shulkhorn@gmail.com
+     --- edited fetching-info method for del-ins site
+
   -- Date Mar-31-2021 SeokCholHong shulkhorn@gmail.com
      --- changed ref/alt conditions in contingency table. alt is counted based on adi alt
 
@@ -33,7 +36,7 @@ bool CINFO::CalcInfo()
 {
 	if(m_bIsDebug) cout << "- CINFO::CalcInfo()" << endl;
 
-	m_Input.vfVaf.resize(m_Input.vsChr.size());
+	// m_Input.vfVaf.resize(m_Input.vsChr.size());
 	m_Input.vfStrandBias.resize(m_Input.vsChr.size());
 	m_Input.v2nReadLen.resize(m_Input.vsChr.size());
 	m_Input.v2nMapQ.resize(m_Input.vsChr.size());
@@ -133,31 +136,18 @@ bool CINFO::GetVarInfo(int nIdx, string sChr, int nChr, int nPos, string sRef, s
 			int nLast = QcInfo.vfBaseQ.size()-1;
 			QcInfo.vfBaseQ[nLast] = QcInfo.vfBaseQ[nLast]/2.0;
 		}
-		cout << sChr<<" " << nPos<<" " << sRef<<" " << sAlt << endl;
-		for(int ins=0;ins<QcInfo.vsForwardIns.size();ins++){
-			cout << QcInfo.vsForwardIns[ins]<< " ";
-		}
-		cout << endl<<endl;
-		for(int ins=0;ins<QcInfo.vsReverseIns.size();ins++){
-			cout << QcInfo.vsReverseIns[ins]<< " ";
-		}
-		cout << endl<<endl;
-
 		GetAnalysisDelIns(QcInfo, sRef, sAlt);
-		cout << QcInfo.fStrandBias << " " << m_Input.vfVaf[nIdx]<< endl;
-		exit(1);
 	} else{
 		while((nRet = bam_iter_read(finBam, bamIter, b)) >= 0){
 			GetNb(b, nPos - (b->core.pos+1), QcInfo);
 		}
 		GetAnalysis(QcInfo, sRef, sAlt);
-
-		m_Input.vfVaf[nIdx] = QcInfo.fVaf;
-		m_Input.vfStrandBias[nIdx] = QcInfo.fStrandBias;
-		m_Input.v2nReadLen[nIdx] = QcInfo.vnReadLen;
-		m_Input.v2nMapQ[nIdx] = QcInfo.vnMapQ;
-		m_Input.v2fBaseQ[nIdx] = QcInfo.vfBaseQ;
 	}
+	m_Input.vfStrandBias[nIdx] = QcInfo.fStrandBias;
+	m_Input.v2nReadLen[nIdx] = QcInfo.vnReadLen;
+	m_Input.v2nMapQ[nIdx] = QcInfo.vnMapQ;
+	m_Input.v2fBaseQ[nIdx] = QcInfo.vfBaseQ;
+
 	if(QcInfo.vnMapQ.size()<1||QcInfo.vfBaseQ.size()<1){
 		cout << sChr << " " << nPos << endl;
 		exit(1);
@@ -555,36 +545,36 @@ bool CINFO::GetAnalysis(QCINFO &QcInfo, string sRef, string sAlt){
 			nRR = nReverseC+nReverseG+nReverseA+nReverseIns+nReverseDel;
 		}
 		QcInfo.fStrandBias = STATTEST::GetFisherPvalue(nFR,nRR,nFA,nRA);
-		QcInfo.fVaf = (float)(nFA+nRA)/(nFR+nRR+nFA+nRA);
+		// QcInfo.fVaf = (float)(nFA+nRA)/(nFR+nRR+nFA+nRA);
 	}
 
-	if(nRefSize!=nAltSize){
-		if(sRef[0]=='A'){
-			nFR = nFrontA;
-			nFA = nFrontC+nFrontG+nFrontT+nForwardIns+nForwardDel;
-			nRR = nReverseA;
-			nRA = nReverseC+nReverseG+nReverseT+nReverseIns+nReverseDel;
-		}
-		else if(sRef[0]=='C'){
-			nFR = nFrontC;
-			nFA = nFrontA+nFrontG+nFrontT+nForwardIns+nForwardDel;
-			nRR = nReverseC;
-			nRA = nReverseA+nReverseG+nReverseT+nReverseIns+nReverseDel;
-		}
-		else if(sRef[0]=='G'){
-			nFR = nFrontG;
-			nFA = nFrontC+nFrontA+nFrontT+nForwardIns+nForwardDel;
-			nRR = nReverseG;
-			nRA = nReverseC+nReverseA+nReverseT+nReverseIns+nReverseDel;
-		}
-		else if(sRef[0]=='T'){
-			nFR = nFrontT;
-			nFA = nFrontC+nFrontG+nFrontA+nForwardIns+nForwardDel;
-			nRR = nReverseT;
-			nRA = nReverseC+nReverseG+nReverseA+nReverseIns+nReverseDel;
-		}
-		QcInfo.fVaf = (float)(nFA+nRA)/(nFR+nRR+nFA+nRA);
-	}
+	// if(nRefSize!=nAltSize){
+	// 	if(sRef[0]=='A'){
+	// 		nFR = nFrontA;
+	// 		nFA = nFrontC+nFrontG+nFrontT+nForwardIns+nForwardDel;
+	// 		nRR = nReverseA;
+	// 		nRA = nReverseC+nReverseG+nReverseT+nReverseIns+nReverseDel;
+	// 	}
+	// 	else if(sRef[0]=='C'){
+	// 		nFR = nFrontC;
+	// 		nFA = nFrontA+nFrontG+nFrontT+nForwardIns+nForwardDel;
+	// 		nRR = nReverseC;
+	// 		nRA = nReverseA+nReverseG+nReverseT+nReverseIns+nReverseDel;
+	// 	}
+	// 	else if(sRef[0]=='G'){
+	// 		nFR = nFrontG;
+	// 		nFA = nFrontC+nFrontA+nFrontT+nForwardIns+nForwardDel;
+	// 		nRR = nReverseG;
+	// 		nRA = nReverseC+nReverseA+nReverseT+nReverseIns+nReverseDel;
+	// 	}
+	// 	else if(sRef[0]=='T'){
+	// 		nFR = nFrontT;
+	// 		nFA = nFrontC+nFrontG+nFrontA+nForwardIns+nForwardDel;
+	// 		nRR = nReverseT;
+	// 		nRA = nReverseC+nReverseG+nReverseA+nReverseIns+nReverseDel;
+	// 	}
+	// 	QcInfo.fVaf = (float)(nFA+nRA)/(nFR+nRR+nFA+nRA);
+	// }
 	return true;
 }
 
