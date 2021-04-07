@@ -39,6 +39,7 @@ bool CINFO::ReportBamInfo()
 		fout << "\t\t\t\"alt\" : \"" 		<< m_Input.vsAlt[i] << "\"," << endl;
 		fout << "\t\t\t\"vaf\" : "	 		<< m_Input.vdVaf[i] << "," << endl;
 		fout << "\t\t\t\"strandBias\" : "	<< m_Input.vfStrandBias[i] << "," << endl;
+		fout << "\t\t\t\"contingency\" : "	<< m_Input.vsContingencyTable[i] << "," << endl;
 		fout << "\t\t\t\"readLen\" : [";
 		for(unsigned int j=0; j<m_Input.v2nReadLen[i].size()-1; j++)
 			fout << m_Input.v2nReadLen[i][j] << ",";
