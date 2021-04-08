@@ -67,6 +67,10 @@ string CINFO::to_string(double dNum)
 	return ss.str();
 }
 
+string CINFO::Table2String(int nFR,int nRR,int nFA,int nRA){
+	return "\""+to_string(nFR)+","+to_string(nRR)+","+to_string(nFA)+","+to_string(nRA)+"\"";
+}
+
 //////////////////////////////////////////// Loading view ////////////////////////////////
 int CINFO::ViewStatus(int nCurr, int nTotal, string sId, bool bIsNoDel)
 {
