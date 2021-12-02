@@ -49,9 +49,7 @@ struct QCINFO
 	vector<uint16_t> vnForwardDel;
 	vector<string> vsReverseIns;
 	vector<uint16_t> vnReverseDel;
-	string sContingencyTable;
 	QCINFO(){
-		sContingencyTable = "0,0,0,0";
 		nFrontA = nFrontC = nFrontG = nFrontT = 0;
 		nReverseA = nReverseC = nReverseG = nReverseT = 0;
 	}
@@ -75,7 +73,6 @@ struct VARIANT
 
 	//AS IS: BAM QC Information
 	// vector<float> vfVaf;					// variant allele freq
-	vector<string> vsContingencyTable;
 	vector<float> vfStrandBias;				// strand bias 
 	vector<vector<uint16_t> > v2nReadLen;	// [loci][read lenths]
 	vector<vector<uint8_t> > v2nMapQ;		// [loci][mapping qualities]
@@ -164,7 +161,7 @@ private:
 	string to_string(unsigned long);
 	string to_string(uint16_t);
 	string to_string(double);
-	string Table2String(int,int,int, int);
+
 };
 
 

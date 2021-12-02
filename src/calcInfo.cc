@@ -40,7 +40,6 @@ bool CINFO::CalcInfo()
 	if(m_bIsDebug) cout << "- CINFO::CalcInfo()" << endl;
 
 	// m_Input.vfVaf.resize(m_Input.vsChr.size());
-	m_Input.vsContingencyTable.resize(m_Input.vsChr.size());
 	m_Input.vfStrandBias.resize(m_Input.vsChr.size());
 	m_Input.v2nReadLen.resize(m_Input.vsChr.size());
 	m_Input.v2nMapQ.resize(m_Input.vsChr.size());
@@ -147,7 +146,6 @@ bool CINFO::GetVarInfo(int nIdx, string sChr, int nChr, int nPos, string sRef, s
 		}
 		GetAnalysis(QcInfo, sRef, sAlt);
 	}
-	m_Input.vsContingencyTable[nIdx] = QcInfo.sContingencyTable;
 	m_Input.vfStrandBias[nIdx] = QcInfo.fStrandBias;
 	m_Input.v2nReadLen[nIdx] = QcInfo.vnReadLen;
 	m_Input.v2nMapQ[nIdx] = QcInfo.vnMapQ;
@@ -468,7 +466,7 @@ bool CINFO::GetAnalysisDelIns(QCINFO &QcInfo, string sRef, string sAlt){
 	nRA = nMatch;
 
 	QcInfo.fStrandBias = STATTEST::GetFisherPvalue(nFR,nRR,nFA,nRA);
-	QcInfo.sContingencyTable = Table2String(nFR,nRR,nFA,nRA);
+
 	return true;
 }
 bool CINFO::GetAnalysis(QCINFO &QcInfo, string sRef, string sAlt){
@@ -507,7 +505,6 @@ bool CINFO::GetAnalysis(QCINFO &QcInfo, string sRef, string sAlt){
 		nRA = nMatch;
 
 		QcInfo.fStrandBias = STATTEST::GetFisherPvalue(nFR,nRR,nFA,nRA);
-		QcInfo.sContingencyTable = Table2String(nFR,nRR,nFA,nRA);
 	}
 	else if(nRefSize>nAltSize){
 		int nMatch=0;
@@ -524,7 +521,6 @@ bool CINFO::GetAnalysis(QCINFO &QcInfo, string sRef, string sAlt){
 		nRA = nMatch;
 
 		QcInfo.fStrandBias = STATTEST::GetFisherPvalue(nFR,nRR,nFA,nRA);
-		QcInfo.sContingencyTable = Table2String(nFR,nRR,nFA,nRA);
 	}
 	else{
 		if(sAlt=="A"){
@@ -552,7 +548,6 @@ bool CINFO::GetAnalysis(QCINFO &QcInfo, string sRef, string sAlt){
 			nRR = nReverseC+nReverseG+nReverseA+nReverseIns+nReverseDel;
 		}
 		QcInfo.fStrandBias = STATTEST::GetFisherPvalue(nFR,nRR,nFA,nRA);
-		QcInfo.sContingencyTable = Table2String(nFR,nRR,nFA,nRA);
 		// QcInfo.fVaf = (float)(nFA+nRA)/(nFR+nRR+nFA+nRA);
 	}
 
